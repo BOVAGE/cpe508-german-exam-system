@@ -1,0 +1,267 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  LECTURER
+  STUDENT
+}
+
+enum ExamKind {
+  MID_SEMESTER
+  END_OF_SEMESTER
+  QUIZ
+  OTHER
+}
+
+enum GradingMode {
+  STRICT
+  NON_STRICT
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  email              String?            @unique
+  registrationNumber String?            @unique // Required and unique for STUDENT role
+  password           String             // Hashed
+  role               Role
+  firstName          String
+  lastName           String
+  departmentId       String?
+  department         Department?        @relation(fields: [departmentId], references: [id])
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  
+  // Relations
+  courseAssignments  CourseAssignment[]
+  createdExams       Exam[]             @relation("ExamCreator")
+  attempts           ExamAttempt[]
+  participants       ExamParticipant[]
+
+  @@index([role])
+}
+
+model Faculty {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  code        String       @unique
+  departments Department[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  facultyId String
+  faculty   Faculty  @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  courses   Course[]
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id                String             @id @default(uuid())
+  name              String
+  code              String             @unique
+  departmentId      String
+  department        Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  courseAssignments CourseAssignment[]
+  exams             Exam[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model CourseAssignment {
+  id           String   @id @default(uuid())
+  lecturerId   String
+  lecturer     User     @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  academicYear String   // e.g. "2025/2026"
+  session      String   // e.g. "Harmattan" or "Rain"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([lecturerId, courseId, academicYear, session])
+}
+
+model Exam {
+  id             String       @id @default(uuid())
+  courseId       String
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  academicYear   String       // e.g. "2025/2026"
+  session        String       // e.g. "Harmattan" or "Rain"
+  examKind       ExamKind
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  duration       Int          // in minutes
+  gradingMode    GradingMode
+  status         ExamStatus   @default(DRAFT)
+  createdById    String
+  creator        User         @relation("ExamCreator", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  topics         Topic[]
+  topicConfigs   ExamTopicConfig[]
+  participants   ExamParticipant[]
+  attempts       ExamAttempt[]
+
+  @@index([courseId])
+  @@index([status])
+}
+
+model Topic {
+  id           String            @id @default(uuid())
+  examId       String
+  exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  questions    Question[]
+  topicConfigs ExamTopicConfig[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([examId, title])
+}
+
+model ExamTopicConfig {
+  examId        String
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  topicId       String
+  topic         Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questionCount Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@id([examId, topicId])
+}
+
+model Question {
+  id                 String            @id @default(uuid())
+  topicId            String
+  topic              Topic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questionText       String            // e.g., "The CPU consists of the {{gap:1}} and {{gap:2}}."
+  previousQuestionId String?           @unique
+  previousQuestion   Question?         @relation("QuestionDependency", fields: [previousQuestionId], references: [id], onDelete: SetNull)
+  nextQuestion       Question?         @relation("QuestionDependency")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  
+  // Relations
+  gaps               QuestionGap[]
+  attemptQuestions   AttemptQuestion[]
+
+  @@index([topicId])
+}
+
+model QuestionGap {
+  id                String             @id @default(uuid())
+  questionId        String
+  question          Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  position          Int                // 1-indexed position matching the gap placeholder
+  points            Float              @default(1.0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  acceptedAnswers   AcceptedAnswer[]
+  attemptGapAnswers AttemptGapAnswer[]
+
+  @@unique([questionId, position])
+}
+
+model AcceptedAnswer {
+  id            String      @id @default(uuid())
+  questionGapId String
+  questionGap   QuestionGap @relation(fields: [questionGapId], references: [id], onDelete: Cascade)
+  answer        String      // Normalized text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([questionGapId])
+}
+
+model ExamParticipant {
+  id        String   @id @default(uuid())
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([examId, studentId])
+}
+
+model ExamAttempt {
+  id          String        @id @default(uuid())
+  examId      String
+  exam        Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  startedAt   DateTime      @default(now())
+  submittedAt DateTime?
+  status      AttemptStatus @default(IN_PROGRESS)
+  score       Float         @default(0.0)
+  percentage  Float         @default(0.0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  questions   AttemptQuestion[]
+
+  @@unique([examId, studentId])
+  @@index([status])
+}
+
+model AttemptQuestion {
+  id           String             @id @default(uuid())
+  attemptId    String
+  attempt      ExamAttempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  displayOrder Int
+  scoreAwarded Float              @default(0.0)
+
+  // Relations
+  gapAnswers   AttemptGapAnswer[]
+
+  @@unique([attemptId, questionId])
+  @@unique([attemptId, displayOrder])
+}
+
+model AttemptGapAnswer {
+  id                String          @id @default(uuid())
+  attemptQuestionId String
+  attemptQuestion   AttemptQuestion @relation(fields: [attemptQuestionId], references: [id], onDelete: Cascade)
+  questionGapId     String
+  questionGap       QuestionGap     @relation(fields: [questionGapId], references: [id], onDelete: Cascade)
+  answer            String          // The student's text, can be empty
+  isCorrect         Boolean         @default(false)
+  scoreAwarded      Float           @default(0.0)
+
+  @@unique([attemptQuestionId, questionGapId])
+}

@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-indigo-500/30 selection:text-indigo-200;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom Scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-950;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-800 rounded hover:bg-slate-700 transition-colors;
+  }
+}
+
+@layer components {
+  /* Glassmorphism Panels */
+  .glass-panel {
+    @apply bg-slate-900/60 backdrop-blur-md border border-slate-800/80 shadow-xl shadow-black/20 rounded-xl;
+  }
+  
+  .glass-card {
+    @apply bg-slate-900/40 backdrop-blur-sm border border-slate-800/50 shadow-md shadow-black/10 rounded-lg hover:border-slate-700/60 hover:bg-slate-900/60 hover:scale-[1.008] transition-all duration-300;
+  }
+
+  .glass-input {
+    @apply bg-slate-950/80 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200;
+  }
+
+  .glass-btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .glass-btn-secondary {
+    @apply bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 font-medium text-sm px-4 py-2.5 rounded-lg active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .glass-btn-danger {
+    @apply bg-red-600 hover:bg-red-500 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-lg shadow-red-600/20 hover:shadow-red-600/30 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .glass-modal-overlay {
+    @apply fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4;
+  }
+
+  .glass-modal-content {
+    @apply glass-panel w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto;
+    animation: modal-zoom 0.2s ease-out;
+  }
+}
+
+/* Animations */
+@keyframes modal-zoom {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

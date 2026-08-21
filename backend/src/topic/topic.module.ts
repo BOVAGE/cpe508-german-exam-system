@@ -1,0 +1,12 @@
+import { Module } from '@nestjs/common';
+import { TopicService } from './topic.service';
+import { TopicController } from './topic.controller';
+import { ExamModule } from '../exam/exam.module';
+
+@Module({
+  imports: [ExamModule],
+  controllers: [TopicController],
+  providers: [TopicService],
+  exports: [TopicService],
+})
+export class TopicModule {}
