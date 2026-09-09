@@ -49,7 +49,7 @@ export class UsersService {
     }
 
     // 3. Hash the password
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.lastName, 10);
 
     // 4. Create user record
     return this.prisma.user.create({
