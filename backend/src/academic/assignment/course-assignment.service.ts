@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCourseAssignmentDto } from './dto/create-assignment.dto';
 import { Role } from '@prisma/client';
@@ -16,7 +20,9 @@ export class CourseAssignmentService {
       throw new NotFoundException(`User with ID ${dto.lecturerId} not found`);
     }
     if (lecturer.role !== Role.LECTURER) {
-      throw new BadRequestException(`User ${lecturer.firstName} ${lecturer.lastName} is not a lecturer (role is ${lecturer.role})`);
+      throw new BadRequestException(
+        `User ${lecturer.firstName} ${lecturer.lastName} is not a lecturer (role is ${lecturer.role})`,
+      );
     }
 
     // 2. Verify course exists
@@ -39,7 +45,9 @@ export class CourseAssignmentService {
       },
     });
     if (existing) {
-      throw new BadRequestException('This lecturer is already assigned to this course for the specified academic year and session');
+      throw new BadRequestException(
+        'This lecturer is already assigned to this course for the specified academic year and session',
+      );
     }
 
     return this.prisma.courseAssignment.create({
@@ -81,7 +89,9 @@ export class CourseAssignmentService {
   }
 
   async remove(id: string) {
-    const assignment = await this.prisma.courseAssignment.findUnique({ where: { id } });
+    const assignment = await this.prisma.courseAssignment.findUnique({
+      where: { id },
+    });
     if (!assignment) {
       throw new NotFoundException(`Course assignment with ID ${id} not found`);
     }

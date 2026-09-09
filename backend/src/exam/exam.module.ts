@@ -12,15 +12,7 @@ import { ExamParticipantController } from './exam-participant.controller';
     ExamTopicConfigController,
     ExamParticipantController,
   ],
-  providers: [
-    ExamService,
-    ExamTopicConfigService,
-    ExamParticipantService,
-  ],
-  exports: [
-    ExamService,
-    ExamTopicConfigService,
-    ExamParticipantService,
-  ],
+  providers: [ExamService, ExamTopicConfigService, ExamParticipantService],
+  exports: [ExamService, ExamTopicConfigService, ExamParticipantService],
 })
 export class ExamModule {}

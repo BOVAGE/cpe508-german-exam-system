@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExamTopicConfigDto } from './dto/create-topic-config.dto';
 import { ExamService } from './exam.service';
@@ -12,14 +17,17 @@ export class ExamTopicConfigService {
   ) {}
 
   // Public Helper: Group questions into block sizes for subset-sum validation and randomization
-  async getTopicBlocks(topicId: string, tx: any = this.prisma): Promise<{ id: string; size: number; questionIds: string[] }[]> {
+  async getTopicBlocks(
+    topicId: string,
+    tx: any = this.prisma,
+  ): Promise<{ id: string; size: number; questionIds: string[] }[]> {
     const questions = await tx.question.findMany({
       where: { topicId },
       select: { id: true, previousQuestionId: true },
     });
 
     const nextMap = new Map<string, string>(); // prevQuestionId -> currentQuestionId
-    const isNextSet = new Set<string>();       // set of currentQuestionIds that depend on something
+    const isNextSet = new Set<string>(); // set of currentQuestionIds that depend on something
 
     questions.forEach((q) => {
       if (q.previousQuestionId) {
@@ -69,7 +77,9 @@ export class ExamTopicConfigService {
   }
 
   async upsertConfig(dto: CreateExamTopicConfigDto, user: User) {
-    const exam = await this.prisma.exam.findUnique({ where: { id: dto.examId } });
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: dto.examId },
+    });
     if (!exam) {
       throw new NotFoundException(`Exam with ID ${dto.examId} not found`);
     }
@@ -82,12 +92,16 @@ export class ExamTopicConfigService {
     await this.examService.checkExamLocked(dto.examId);
 
     // Verify Topic belongs to the Exam
-    const topic = await this.prisma.topic.findUnique({ where: { id: dto.topicId } });
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: dto.topicId },
+    });
     if (!topic) {
       throw new NotFoundException(`Topic with ID ${dto.topicId} not found`);
     }
     if (topic.examId !== dto.examId) {
-      throw new BadRequestException('This topic does not belong to the specified exam');
+      throw new BadRequestException(
+        'This topic does not belong to the specified exam',
+      );
     }
 
     // Validate if the requested questionCount can be satisfied by the topic blocks
@@ -96,13 +110,13 @@ export class ExamTopicConfigService {
 
     if (dto.questionCount > totalQuestionsAvailable) {
       throw new BadRequestException(
-        `Topic "${topic.title}" only has ${totalQuestionsAvailable} questions, but ${dto.questionCount} were requested.`
+        `Topic "${topic.title}" only has ${totalQuestionsAvailable} questions, but ${dto.questionCount} were requested.`,
       );
     }
 
     if (!this.canFormSubsetSum(blocks, dto.questionCount)) {
       throw new BadRequestException(
-        `Requested count (${dto.questionCount}) cannot be satisfied exactly because of question dependency chains.`
+        `Requested count (${dto.questionCount}) cannot be satisfied exactly because of question dependency chains.`,
       );
     }
 
@@ -134,7 +148,9 @@ export class ExamTopicConfigService {
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only modify configs for exams you created');
+      throw new ForbiddenException(
+        'You can only modify configs for exams you created',
+      );
     }
 
     // Check lock state
@@ -144,7 +160,9 @@ export class ExamTopicConfigService {
       where: { examId_topicId: { examId, topicId } },
     });
     if (!config) {
-      throw new NotFoundException('Topic configuration not found for this exam');
+      throw new NotFoundException(
+        'Topic configuration not found for this exam',
+      );
     }
 
     await this.prisma.examTopicConfig.delete({

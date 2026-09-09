@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
@@ -14,13 +19,17 @@ export class TopicService {
 
   async create(dto: CreateTopicDto, user: User) {
     // 1. Verify Exam exists and check permissions
-    const exam = await this.prisma.exam.findUnique({ where: { id: dto.examId } });
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: dto.examId },
+    });
     if (!exam) {
       throw new NotFoundException(`Exam with ID ${dto.examId} not found`);
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only create topics for exams you created');
+      throw new ForbiddenException(
+        'You can only create topics for exams you created',
+      );
     }
 
     // 2. Check lock state
@@ -36,7 +45,9 @@ export class TopicService {
       },
     });
     if (existing) {
-      throw new BadRequestException(`Topic with title "${dto.title}" already exists in this exam`);
+      throw new BadRequestException(
+        `Topic with title "${dto.title}" already exists in this exam`,
+      );
     }
 
     return this.prisma.topic.create({
@@ -47,7 +58,7 @@ export class TopicService {
   async findAll(examId: string, user: User) {
     // Check permission to view exam
     await this.examService.findOne(examId, user);
-    
+
     return this.prisma.topic.findMany({
       where: { examId },
       include: {
@@ -98,7 +109,9 @@ export class TopicService {
     }
 
     if (user.role === Role.LECTURER && topic.exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only update topics for exams you created');
+      throw new ForbiddenException(
+        'You can only update topics for exams you created',
+      );
     }
 
     // Check lock state
@@ -114,7 +127,9 @@ export class TopicService {
         },
       });
       if (existing) {
-        throw new BadRequestException(`Topic with title "${dto.title}" already exists in this exam`);
+        throw new BadRequestException(
+          `Topic with title "${dto.title}" already exists in this exam`,
+        );
       }
     }
 
@@ -134,7 +149,9 @@ export class TopicService {
     }
 
     if (user.role === Role.LECTURER && topic.exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only delete topics for exams you created');
+      throw new ForbiddenException(
+        'You can only delete topics for exams you created',
+      );
     }
 
     // Check lock state

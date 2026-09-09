@@ -9,14 +9,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'super-secret-jwt-key-replace-in-production-12345',
+      secretOrKey:
+        process.env.JWT_SECRET ||
+        'super-secret-jwt-key-replace-in-production-12345',
     });
   }
 
-  async validate(payload: { sub: string; email?: string; registrationNumber?: string; role: string }) {
+  async validate(payload: {
+    sub: string;
+    email?: string;
+    registrationNumber?: string;
+    role: string;
+  }) {
     const user = await this.usersService.findOne(payload.sub);
     if (!user) {
-      throw new UnauthorizedException('Session expired or user no longer exists');
+      throw new UnauthorizedException(
+        'Session expired or user no longer exists',
+      );
     }
     return user;
   }

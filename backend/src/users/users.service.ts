@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -16,7 +20,9 @@ export class UsersService {
     }
 
     if (dto.role !== Role.STUDENT && dto.registrationNumber) {
-      throw new BadRequestException('Only students can have registration numbers');
+      throw new BadRequestException(
+        'Only students can have registration numbers',
+      );
     }
 
     // 2. Validate uniqueness of email and registration number
@@ -25,7 +31,9 @@ export class UsersService {
         where: { email: dto.email },
       });
       if (existingUser) {
-        throw new BadRequestException(`User with email ${dto.email} already exists`);
+        throw new BadRequestException(
+          `User with email ${dto.email} already exists`,
+        );
       }
     }
 
@@ -34,7 +42,9 @@ export class UsersService {
         where: { registrationNumber: dto.registrationNumber },
       });
       if (existingUser) {
-        throw new BadRequestException(`Student with registration number ${dto.registrationNumber} already exists`);
+        throw new BadRequestException(
+          `Student with registration number ${dto.registrationNumber} already exists`,
+        );
       }
     }
 
@@ -60,6 +70,7 @@ export class UsersService {
         firstName: true,
         lastName: true,
         departmentId: true,
+        firstTimeLogin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -116,14 +127,21 @@ export class UsersService {
 
     // Uniqueness checks if updating
     if (dto.email && dto.email !== user.email) {
-      const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      const existing = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
       if (existing) {
         throw new BadRequestException('Email already in use');
       }
     }
 
-    if (dto.registrationNumber && dto.registrationNumber !== user.registrationNumber) {
-      const existing = await this.prisma.user.findUnique({ where: { registrationNumber: dto.registrationNumber } });
+    if (
+      dto.registrationNumber &&
+      dto.registrationNumber !== user.registrationNumber
+    ) {
+      const existing = await this.prisma.user.findUnique({
+        where: { registrationNumber: dto.registrationNumber },
+      });
       if (existing) {
         throw new BadRequestException('Registration number already in use');
       }
