@@ -249,6 +249,21 @@ const ExamAttemptRoom: React.FC = () => {
     return 'text-indigo-400 border-slate-800';
   };
 
+  const calculateMaxScore = (attemptObj: any) => {
+    if (!attemptObj) return 0;
+    if (attemptObj.questions && attemptObj.questions.length > 0) {
+      const totalPoints = attemptObj.questions.reduce((sum: number, aq: any) => {
+        const gaps = aq.question?.gaps || [];
+        return sum + gaps.reduce((s: number, g: any) => s + (g.points || 0), 0);
+      }, 0);
+      if (totalPoints > 0) return totalPoints;
+    }
+    if (attemptObj.percentage && attemptObj.percentage > 0) {
+      return Math.round(attemptObj.score / (attemptObj.percentage / 100));
+    }
+    return attemptObj.score;
+  };
+
   return (
     <div className="space-y-6">
       {/* Graded report redirection check */}
@@ -258,7 +273,7 @@ const ExamAttemptRoom: React.FC = () => {
             <CheckCircle2 className="h-6 w-6" />
             <h2 className="font-bold">This Exam Attempt Has Been Graded</h2>
           </div>
-          <p className="text-xs text-slate-400">Score: {attempt.score} | Percentage: {attempt.percentage.toFixed(1)}%</p>
+          <p className="text-xs text-slate-400">Score: {attempt.score} / {calculateMaxScore(attempt)} | Percentage: {attempt.percentage.toFixed(1)}%</p>
           <button onClick={() => navigate('/student/dashboard')} className="glass-btn-primary py-2 px-4 text-xs">
             Return to Dashboard
           </button>
@@ -451,7 +466,7 @@ const ExamAttemptRoom: React.FC = () => {
             <div className="my-6 grid grid-cols-2 gap-4">
               <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Score Obtained</p>
-                <p className="text-lg font-black text-slate-200">{resultData.score} / {resultData.maxScore || resultData.score}</p>
+                <p className="text-lg font-black text-slate-200">{resultData.score} / {calculateMaxScore(resultData)}</p>
               </div>
 
               <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1">

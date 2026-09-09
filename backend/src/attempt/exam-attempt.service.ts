@@ -11,6 +11,7 @@ import { ExamTopicConfigService } from '../exam/exam-topic-config.service';
 import { GradingService } from './grading.service';
 import { Role, User, AttemptStatus, ExamStatus } from '@prisma/client';
 import { SubmitAnswerDto } from './dto/submit-answer.dto';
+import { GetExamAttemptsDto } from './dto/get-exam-attempts.dto';
 
 @Injectable()
 export class ExamAttemptService implements OnModuleInit {
@@ -510,7 +511,13 @@ export class ExamAttemptService implements OnModuleInit {
             orderBy: { displayOrder: 'asc' },
             include: {
               question: {
-                select: { id: true, questionText: true },
+                select: {
+                  id: true,
+                  questionText: true,
+                  gaps: {
+                    select: { id: true, position: true, points: true },
+                  },
+                },
               },
               gapAnswers: true,
             },
@@ -544,5 +551,115 @@ export class ExamAttemptService implements OnModuleInit {
     }
 
     return { checkedCount: activeAttempts.length, autoSubmittedCount };
+  }
+
+  // Helper: verify admin or creator permissions for exam attempt management
+  private async checkExamAdminOrCreator(examId: string, user: User) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) {
+      throw new NotFoundException(`Exam with ID ${examId} not found`);
+    }
+    if (user.role === Role.LECTURER && exam.createdById !== user.id) {
+      throw new ForbiddenException(
+        'You are not authorized to manage attempts for this exam',
+      );
+    }
+    return exam;
+  }
+
+  // Get paginated attempts for an exam (Admin/Lecturer)
+  async getExamAttempts(examId: string, user: User, dto: GetExamAttemptsDto) {
+    await this.checkExamAdminOrCreator(examId, user);
+
+    const page = dto.page || 1;
+    const limit = dto.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = { examId };
+
+    if (dto.status) {
+      where.status = dto.status;
+    }
+
+    if (dto.search && dto.search.trim() !== '') {
+      const search = dto.search.trim();
+      where.student = {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { registrationNumber: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    const [attempts, total] = await Promise.all([
+      this.prisma.examAttempt.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              registrationNumber: true,
+              email: true,
+              department: {
+                select: { name: true, code: true },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.examAttempt.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      attempts,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  // Delete a single attempt (Admin/Lecturer)
+  async deleteAttempt(examId: string, attemptId: string, user: User) {
+    await this.checkExamAdminOrCreator(examId, user);
+
+    const attempt = await this.prisma.examAttempt.findFirst({
+      where: { id: attemptId, examId },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(
+        `Attempt with ID ${attemptId} not found for this exam`,
+      );
+    }
+
+    await this.prisma.examAttempt.delete({
+      where: { id: attemptId },
+    });
+
+    return { message: 'Exam attempt successfully deleted' };
+  }
+
+  // Delete all attempts for an exam (Admin/Lecturer)
+  async deleteAllAttempts(examId: string, user: User) {
+    await this.checkExamAdminOrCreator(examId, user);
+
+    const result = await this.prisma.examAttempt.deleteMany({
+      where: { examId },
+    });
+
+    return {
+      message: `Successfully reset/deleted ${result.count} exam attempt(s)`,
+      deletedCount: result.count,
+    };
   }
 }

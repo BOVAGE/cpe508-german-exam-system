@@ -136,13 +136,41 @@ export class ExamParticipantService {
       );
     }
 
+    const extractCellString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val === 'number') return String(val).trim();
+
+      if (typeof val === 'object') {
+        if (val.text !== undefined) {
+          if (typeof val.text === 'string') return val.text.trim();
+          if (typeof val.text === 'object') return extractCellString(val.text);
+        }
+        if (val.hyperlink !== undefined) {
+          return String(val.hyperlink)
+            .replace(/^mailto:/i, '')
+            .trim();
+        }
+        if (val.result !== undefined) {
+          return extractCellString(val.result);
+        }
+        if (Array.isArray(val.richText)) {
+          return val.richText
+            .map((rt: any) => rt.text || '')
+            .join('')
+            .trim();
+        }
+      }
+      return String(val).trim();
+    };
+
     const rows: any[] = [];
     let headers: string[] = [];
 
     worksheet.eachRow((row, rowNumber) => {
       const values = (row.values as any[]).slice(1);
       if (rowNumber === 1) {
-        headers = values.map((h) => String(h).trim().toLowerCase());
+        headers = values.map((h) => extractCellString(h).toLowerCase());
       } else {
         const rowData: any = {};
         headers.forEach((header, index) => {
@@ -167,72 +195,96 @@ export class ExamParticipantService {
       }
     }
 
+    checkField(regNumAliases, 'registrationNumber');
+    checkField(firstNameAliases, 'firstName');
+    checkField(lastNameAliases, 'lastName');
+    checkField(emailAliases, 'email');
+    checkField(deptCodeAliases, 'departmentCode');
+
+    const getVal = (data: any, aliases: string[]) => {
+      for (const key of Object.keys(data)) {
+        if (aliases.includes(normalize(key))) {
+          return extractCellString(data[key]);
+        }
+      }
+      return '';
+    };
+
     const errors: string[] = [];
     let importedCount = 0;
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const { rowNumber, data } of rows) {
-        const regNum = String(data['registration number'] || '').trim();
-        const firstName = String(data['first name'] || '').trim();
-        const lastName = String(data['last name'] || '').trim();
-        const email = String(data['email'] || '')
-          .trim()
-          .toLowerCase();
-        const deptCode = String(data['department code'] || '')
-          .trim()
-          .toUpperCase();
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const { rowNumber, data } of rows) {
+          const regNum = String(data['registration number'] || '').trim();
+          const firstName = String(data['first name'] || '').trim();
+          const lastName = String(data['last name'] || '').trim();
+          const email = String(data['email'] || '')
+            .trim()
+            .toLowerCase();
+          const deptCode = String(data['department code'] || '')
+            .trim()
+            .toUpperCase();
 
-        if (!regNum || !firstName || !lastName || !email || !deptCode) {
-          errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
-          continue;
+          if (!regNum || !firstName || !lastName || !email || !deptCode) {
+            errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
+            continue;
+          }
+
+          const dept = await tx.department.findUnique({
+            where: { code: deptCode },
+          });
+          if (!dept) {
+            errors.push(
+              `Row ${rowNumber}: Department code "${deptCode}" does not exist.`,
+            );
+            continue;
+          }
+
+          const existingReg = await tx.user.findUnique({
+            where: { registrationNumber: regNum },
+          });
+          if (existingReg) {
+            errors.push(
+              `Row ${rowNumber}: Registration number "${regNum}" is already registered.`,
+            );
+            continue;
+          }
+
+          const existingEmail = await tx.user.findUnique({ where: { email } });
+          if (existingEmail) {
+            errors.push(
+              `Row ${rowNumber}: Email "${email}" is already registered.`,
+            );
+            continue;
+          }
+
+          const defaultPassword = lastName.toLowerCase();
+          const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+          await tx.user.create({
+            data: {
+              registrationNumber: regNum,
+              firstName,
+              lastName,
+              email,
+              password: hashedPassword,
+              role: Role.STUDENT,
+              departmentId: deptId,
+            },
+          });
+
+          // Mark as existing in local sets to prevent duplicate inserts within the same Excel file
+          existingRegSet.add(regNum);
+          existingEmailSet.add(email);
+          importedCount++;
         }
-
-        const dept = await tx.department.findUnique({
-          where: { code: deptCode },
-        });
-        if (!dept) {
-          errors.push(
-            `Row ${rowNumber}: Department code "${deptCode}" does not exist.`,
-          );
-          continue;
-        }
-
-        const existingReg = await tx.user.findUnique({
-          where: { registrationNumber: regNum },
-        });
-        if (existingReg) {
-          errors.push(
-            `Row ${rowNumber}: Registration number "${regNum}" is already registered.`,
-          );
-          continue;
-        }
-
-        const existingEmail = await tx.user.findUnique({ where: { email } });
-        if (existingEmail) {
-          errors.push(
-            `Row ${rowNumber}: Email "${email}" is already registered.`,
-          );
-          continue;
-        }
-
-        const defaultPassword = lastName.toLowerCase();
-        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
-        await tx.user.create({
-          data: {
-            registrationNumber: regNum,
-            firstName,
-            lastName,
-            email,
-            password: hashedPassword,
-            role: Role.STUDENT,
-            departmentId: dept.id,
-          },
-        });
-
-        importedCount++;
-      }
-    });
+      },
+      {
+        maxWait: 10000, // 10s wait for connection slot
+        timeout: 60000, // 60s timeout for transaction execution
+      },
+    );
 
     return {
       success: errors.length === 0,
@@ -267,17 +319,63 @@ export class ExamParticipantService {
       );
     }
 
+    const extractCellString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val === 'number') return String(val).trim();
+
+      if (typeof val === 'object') {
+        if (val.text !== undefined) {
+          if (typeof val.text === 'string') return val.text.trim();
+          if (typeof val.text === 'object') return extractCellString(val.text);
+        }
+        if (val.hyperlink !== undefined) {
+          return String(val.hyperlink)
+            .replace(/^mailto:/i, '')
+            .trim();
+        }
+        if (val.result !== undefined) {
+          return extractCellString(val.result);
+        }
+        if (Array.isArray(val.richText)) {
+          return val.richText
+            .map((rt: any) => rt.text || '')
+            .join('')
+            .trim();
+        }
+      }
+      return String(val).trim();
+    };
+
     let headers: string[] = [];
     const registrationNumbers: string[] = [];
+
+    const normalize = (s: string) =>
+      String(s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_]/g, '');
+    const regNumAliases = [
+      'registrationnumber',
+      'registration_number',
+      'registration number',
+      'regnum',
+      'registrationno',
+    ];
 
     worksheet.eachRow((row, rowNumber) => {
       const values = (row.values as any[]).slice(1);
       if (rowNumber === 1) {
-        headers = values.map((h) => String(h).trim().toLowerCase());
+        headers = values.map((h) => extractCellString(h).toLowerCase());
       } else {
-        const regNumIdx = headers.indexOf('registration number');
+        const regNumIdx = headers.findIndex((h) =>
+          regNumAliases.includes(normalize(h)),
+        );
         if (regNumIdx !== -1 && values[regNumIdx]) {
-          registrationNumbers.push(String(values[regNumIdx]).trim());
+          const regStr = extractCellString(values[regNumIdx]);
+          if (regStr) {
+            registrationNumbers.push(regStr);
+          }
         }
       }
     });

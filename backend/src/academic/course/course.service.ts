@@ -2,10 +2,12 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { Role, User } from '@prisma/client';
 
 @Injectable()
 export class CourseService {
@@ -37,28 +39,75 @@ export class CourseService {
     });
   }
 
-  async findAll() {
+  async findAll(user?: User) {
+    const where: any = {};
+
+    if (user && user.role === Role.LECTURER) {
+      where.courseAssignments = {
+        some: {
+          lecturerId: user.id,
+        },
+      };
+    }
+
     return this.prisma.course.findMany({
+      where,
       include: {
         department: {
           include: { faculty: true },
+        },
+        courseAssignments: {
+          include: {
+            lecturer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
         },
       },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: User) {
     const course = await this.prisma.course.findUnique({
       where: { id },
       include: {
         department: {
           include: { faculty: true },
         },
+        courseAssignments: {
+          include: {
+            lecturer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!course) {
       throw new NotFoundException(`Course with ID ${id} not found`);
     }
+
+    if (user && user.role === Role.LECTURER) {
+      const isAssigned = course.courseAssignments.some(
+        (ca) => ca.lecturerId === user.id,
+      );
+      if (!isAssigned) {
+        throw new ForbiddenException(
+          'You are not assigned to teach or manage this course',
+        );
+      }
+    }
+
     return course;
   }
 

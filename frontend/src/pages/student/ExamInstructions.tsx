@@ -30,6 +30,21 @@ const ExamInstructions: React.FC = () => {
 
   const noAttemptExists = attemptError && (attemptError as any).response?.status === 404;
 
+  const calculateMaxScore = (attemptObj: any) => {
+    if (!attemptObj) return 0;
+    if (attemptObj.questions && attemptObj.questions.length > 0) {
+      const totalPoints = attemptObj.questions.reduce((sum: number, aq: any) => {
+        const gaps = aq.question?.gaps || [];
+        return sum + gaps.reduce((s: number, g: any) => s + (g.points || 0), 0);
+      }, 0);
+      if (totalPoints > 0) return totalPoints;
+    }
+    if (attemptObj.percentage && attemptObj.percentage > 0) {
+      return Math.round(attemptObj.score / (attemptObj.percentage / 100));
+    }
+    return attemptObj.score;
+  };
+
   // Mutation to start the attempt
   const startExamMutation = useMutation({
     mutationFn: async () => {
@@ -118,7 +133,7 @@ const ExamInstructions: React.FC = () => {
                   
                   <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1">
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Final Score</p>
-                    <p className="text-lg font-black text-slate-200">{attempt.score} / {attempt.questions?.reduce((sum: number, aq: any) => sum + aq.question.gaps.reduce((s: number, g: any) => s + g.points, 0), 0) || attempt.score}</p>
+                    <p className="text-lg font-black text-slate-200">{attempt.score} / {calculateMaxScore(attempt)}</p>
                   </div>
 
                   <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1">
