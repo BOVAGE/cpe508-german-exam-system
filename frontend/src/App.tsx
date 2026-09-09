@@ -69,7 +69,17 @@ const App: React.FC = () => {
             <Route
               path="/lecturer/exams/:examId"
               element={
-                <ProtectedRoute allowedRoles={['LECTURER']}>
+                <ProtectedRoute allowedRoles={['ADMIN', 'LECTURER']}>
+                  <Layout>
+                    <ExamDetails />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/exams/:examId"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'LECTURER']}>
                   <Layout>
                     <ExamDetails />
                   </Layout>

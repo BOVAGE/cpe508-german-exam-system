@@ -120,65 +120,117 @@ export class ExamParticipantService {
       }
     });
 
-    const required = ['registration number', 'first name', 'last name', 'email', 'department code'];
-    for (const req of required) {
-      if (!headers.includes(req)) {
-        throw new BadRequestException(`Excel sheet is missing required column: "${req}"`);
+    const normalize = (s: string) => String(s || '').trim().toLowerCase().replace(/[\s_]/g, '');
+
+    const regNumAliases = ['registrationnumber', 'registration_number', 'registration number', 'regnum', 'registrationno'];
+    const firstNameAliases = ['firstname', 'first_name', 'first name'];
+    const lastNameAliases = ['lastname', 'last_name', 'last name'];
+    const emailAliases = ['email', 'emailaddress', 'email_address'];
+    const deptCodeAliases = ['departmentcode', 'department_code', 'department code', 'deptcode'];
+
+    const normalizedHeaders = headers.map((h) => normalize(h));
+
+    const checkField = (aliases: string[], label: string) => {
+      if (!normalizedHeaders.some((nh) => aliases.includes(nh))) {
+        throw new BadRequestException(`Excel sheet is missing required column: "${label}"`);
       }
-    }
+    };
+
+    checkField(regNumAliases, 'registrationNumber');
+    checkField(firstNameAliases, 'firstName');
+    checkField(lastNameAliases, 'lastName');
+    checkField(emailAliases, 'email');
+    checkField(deptCodeAliases, 'departmentCode');
+
+    const getVal = (data: any, aliases: string[]) => {
+      for (const key of Object.keys(data)) {
+        if (aliases.includes(normalize(key))) {
+          return data[key];
+        }
+      }
+      return '';
+    };
 
     const errors: string[] = [];
     let importedCount = 0;
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const { rowNumber, data } of rows) {
-        const regNum = String(data['registration number'] || '').trim();
-        const firstName = String(data['first name'] || '').trim();
-        const lastName = String(data['last name'] || '').trim();
-        const email = String(data['email'] || '').trim().toLowerCase();
-        const deptCode = String(data['department code'] || '').trim().toUpperCase();
+    // Pre-fetch all departments for bulk lookup
+    const departments = await this.prisma.department.findMany();
+    const deptMap = new Map(departments.map((d) => [d.code.toUpperCase(), d.id]));
 
-        if (!regNum || !firstName || !lastName || !email || !deptCode) {
-          errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
-          continue;
-        }
+    // Pre-fetch existing registration numbers and emails to avoid N+1 roundtrips over remote network
+    const allRegNums = rows.map(({ data }) => String(getVal(data, regNumAliases) || '').trim()).filter(Boolean);
+    const allEmails = rows.map(({ data }) => String(getVal(data, emailAliases) || '').trim().toLowerCase()).filter(Boolean);
 
-        const dept = await tx.department.findUnique({ where: { code: deptCode } });
-        if (!dept) {
-          errors.push(`Row ${rowNumber}: Department code "${deptCode}" does not exist.`);
-          continue;
-        }
-
-        const existingReg = await tx.user.findUnique({ where: { registrationNumber: regNum } });
-        if (existingReg) {
-          errors.push(`Row ${rowNumber}: Registration number "${regNum}" is already registered.`);
-          continue;
-        }
-
-        const existingEmail = await tx.user.findUnique({ where: { email } });
-        if (existingEmail) {
-          errors.push(`Row ${rowNumber}: Email "${email}" is already registered.`);
-          continue;
-        }
-
-        const defaultPassword = lastName.toLowerCase();
-        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
-        await tx.user.create({
-          data: {
-            registrationNumber: regNum,
-            firstName,
-            lastName,
-            email,
-            password: hashedPassword,
-            role: Role.STUDENT,
-            departmentId: dept.id,
-          },
-        });
-
-        importedCount++;
-      }
+    const existingUsers = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { registrationNumber: { in: allRegNums } },
+          { email: { in: allEmails } },
+        ],
+      },
+      select: { registrationNumber: true, email: true },
     });
+
+    const existingRegSet = new Set(existingUsers.map((u) => u.registrationNumber).filter(Boolean));
+    const existingEmailSet = new Set(existingUsers.map((u) => u.email).filter(Boolean));
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const { rowNumber, data } of rows) {
+          const regNum = String(getVal(data, regNumAliases) || '').trim();
+          const firstName = String(getVal(data, firstNameAliases) || '').trim();
+          const lastName = String(getVal(data, lastNameAliases) || '').trim();
+          const email = String(getVal(data, emailAliases) || '').trim().toLowerCase();
+          const deptCode = String(getVal(data, deptCodeAliases) || '').trim().toUpperCase();
+
+          if (!regNum || !firstName || !lastName || !email || !deptCode) {
+            errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
+            continue;
+          }
+
+          const deptId = deptMap.get(deptCode);
+          if (!deptId) {
+            errors.push(`Row ${rowNumber}: Department code "${deptCode}" does not exist.`);
+            continue;
+          }
+
+          if (existingRegSet.has(regNum)) {
+            errors.push(`Row ${rowNumber}: Registration number "${regNum}" is already registered.`);
+            continue;
+          }
+
+          if (existingEmailSet.has(email)) {
+            errors.push(`Row ${rowNumber}: Email "${email}" is already registered.`);
+            continue;
+          }
+
+          const defaultPassword = lastName.toLowerCase();
+          const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+          await tx.user.create({
+            data: {
+              registrationNumber: regNum,
+              firstName,
+              lastName,
+              email,
+              password: hashedPassword,
+              role: Role.STUDENT,
+              departmentId: deptId,
+            },
+          });
+
+          // Mark as existing in local sets to prevent duplicate inserts within the same Excel file
+          existingRegSet.add(regNum);
+          existingEmailSet.add(email);
+          importedCount++;
+        }
+      },
+      {
+        maxWait: 10000, // 10s wait for connection slot
+        timeout: 60000, // 60s timeout for transaction execution
+      },
+    );
 
     return {
       success: errors.length === 0,
@@ -208,20 +260,23 @@ export class ExamParticipantService {
     let headers: string[] = [];
     const registrationNumbers: string[] = [];
 
+    const normalize = (s: string) => String(s || '').trim().toLowerCase().replace(/[\s_]/g, '');
+    const regNumAliases = ['registrationnumber', 'registration_number', 'registration number', 'regnum', 'registrationno'];
+
     worksheet.eachRow((row, rowNumber) => {
       const values = (row.values as any[]).slice(1);
       if (rowNumber === 1) {
         headers = values.map((h) => String(h).trim().toLowerCase());
       } else {
-        const regNumIdx = headers.indexOf('registration number');
+        const regNumIdx = headers.findIndex((h) => regNumAliases.includes(normalize(h)));
         if (regNumIdx !== -1 && values[regNumIdx]) {
           registrationNumbers.push(String(values[regNumIdx]).trim());
         }
       }
     });
 
-    if (!headers.includes('registration number')) {
-      throw new BadRequestException('Excel sheet is missing required column: "registration number"');
+    if (!headers.some((h) => regNumAliases.includes(normalize(h)))) {
+      throw new BadRequestException('Excel sheet is missing required column: "registrationNumber" (or "registration number")');
     }
 
     const uniqueRegNumsInExcel = Array.from(new Set(registrationNumbers));

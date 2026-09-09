@@ -18,13 +18,15 @@ import {
   Trash,
   Search,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  RotateCcw,
+  Clock
 } from 'lucide-react';
 
 const ExamDetails: React.FC = () => {
   const { examId } = useParams<{ examId: string }>();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'topics' | 'questions' | 'config' | 'participants' | 'settings'>('topics');
+  const [activeTab, setActiveTab] = useState<'topics' | 'questions' | 'config' | 'participants' | 'attempts' | 'settings'>('topics');
 
   // Modal control states
   const [topicModalOpen, setTopicModalOpen] = useState(false);
@@ -55,6 +57,63 @@ const ExamDetails: React.FC = () => {
   const [importResult, setImportResult] = useState<any | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+
+  // Attempt management states
+  const [attemptsPage, setAttemptsPage] = useState<number>(1);
+  const [attemptsLimit, setAttemptsLimit] = useState<number>(10);
+  const [attemptsSearch, setAttemptsSearch] = useState<string>('');
+  const [attemptsStatus, setAttemptsStatus] = useState<string>('');
+  const [deleteAttemptModalOpen, setDeleteAttemptModalOpen] = useState<boolean>(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<any | null>(null);
+  const [deleteAllAttemptsModalOpen, setDeleteAllAttemptsModalOpen] = useState<boolean>(false);
+
+  // Fetch paginated attempts for this exam
+  const { data: attemptsData, isLoading: loadingAttempts } = useQuery({
+    queryKey: ['examAttempts', examId, attemptsPage, attemptsLimit, attemptsSearch, attemptsStatus],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('page', attemptsPage.toString());
+      params.append('limit', attemptsLimit.toString());
+      if (attemptsSearch.trim()) params.append('search', attemptsSearch.trim());
+      if (attemptsStatus) params.append('status', attemptsStatus);
+
+      const res = await api.get(`/exams/${examId}/attempts?${params.toString()}`);
+      return res.data;
+    },
+    enabled: activeTab === 'attempts',
+  });
+
+  const deleteAttemptMutation = useMutation({
+    mutationFn: async (attemptId: string) => {
+      const res = await api.delete(`/exams/${examId}/attempts/${attemptId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['examAttempts', examId] });
+      queryClient.invalidateQueries({ queryKey: ['participants', examId] });
+      setDeleteAttemptModalOpen(false);
+      setSelectedAttempt(null);
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to delete attempt');
+    }
+  });
+
+  const deleteAllAttemptsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.delete(`/exams/${examId}/attempts`);
+      return res.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['examAttempts', examId] });
+      queryClient.invalidateQueries({ queryKey: ['participants', examId] });
+      setDeleteAllAttemptsModalOpen(false);
+      alert(data.message || 'All student attempts have been reset.');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to reset attempts');
+    }
+  });
 
   // Fetch Exam configuration details (which pulls topics, questions, gaps)
   const { data: exam, isLoading: loadingExam } = useQuery({
@@ -507,6 +566,7 @@ const ExamDetails: React.FC = () => {
           { key: 'questions', label: 'Questions CRUD', icon: FileText },
           { key: 'config', label: 'Topic Distribution Settings', icon: Settings },
           { key: 'participants', label: 'Eligible Students', icon: Users },
+          { key: 'attempts', label: 'Attempts & Results', icon: RotateCcw },
           { key: 'settings', label: 'Exam Settings', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -841,7 +901,7 @@ const ExamDetails: React.FC = () => {
                   
                   <form onSubmit={handleParticipantExcelImport} className="space-y-3">
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Upload an Excel file containing a column named <span className="font-mono text-indigo-400">registration number</span>. All rows must exist in the users database.
+                      Upload an Excel file containing a column named <span className="font-mono text-indigo-400">registrationNumber</span> (or <span className="font-mono text-indigo-400">registration number</span>). All rows must exist in the users database.
                     </p>
 
                     <div className="border border-dashed border-slate-800 hover:border-slate-700 rounded-lg p-4 flex flex-col items-center justify-center relative cursor-pointer min-h-[90px]">
@@ -892,6 +952,196 @@ const ExamDetails: React.FC = () => {
 
               </div>
             </div>
+          </div>
+        )}
+        {/* ATTEMPTS & RESULTS TAB */}
+        {activeTab === 'attempts' && (
+          <div className="space-y-6 text-left">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-200">Student Exam Attempts</h2>
+                <p className="text-slate-400 text-xs mt-1">
+                  Manage student test attempts, review live scores, or reset student attempts during testing.
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteAllAttemptsModalOpen(true)}
+                className="px-4 py-2 text-xs font-bold rounded-lg border border-red-500/40 text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all flex items-center space-x-2 shrink-0 self-start md:self-auto"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset All Attempts</span>
+              </button>
+            </div>
+
+            {/* Filters Toolbar */}
+            <div className="glass-panel p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <input
+                  type="text"
+                  value={attemptsSearch}
+                  onChange={(e) => {
+                    setAttemptsSearch(e.target.value);
+                    setAttemptsPage(1);
+                  }}
+                  placeholder="Search by reg number, name, email..."
+                  className="glass-input pl-9 w-full text-xs py-2"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <select
+                  value={attemptsStatus}
+                  onChange={(e) => {
+                    setAttemptsStatus(e.target.value);
+                    setAttemptsPage(1);
+                  }}
+                  className="glass-input text-xs py-2 px-3 bg-slate-900 text-slate-300"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="AUTO_SUBMITTED">Auto Submitted</option>
+                </select>
+
+                <select
+                  value={attemptsLimit}
+                  onChange={(e) => {
+                    setAttemptsLimit(Number(e.target.value));
+                    setAttemptsPage(1);
+                  }}
+                  className="glass-input text-xs py-2 px-3 bg-slate-900 text-slate-300"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Attempts Table */}
+            {loadingAttempts ? (
+              <div className="glass-panel p-12 text-center text-slate-400 text-sm">
+                Loading exam attempts...
+              </div>
+            ) : !attemptsData || attemptsData.attempts.length === 0 ? (
+              <div className="glass-panel p-12 text-center flex flex-col items-center justify-center space-y-3">
+                <Clock className="h-10 w-10 text-slate-600" />
+                <p className="text-slate-400 text-sm font-semibold">No student attempts found.</p>
+                <p className="text-slate-500 text-xs">
+                  {attemptsSearch || attemptsStatus ? 'Try clearing your search or status filters.' : 'Students will appear here once they start their exam attempts.'}
+                </p>
+              </div>
+            ) : (
+              <div className="glass-panel overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+                      <tr>
+                        <th className="px-5 py-3">Student Details</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Score</th>
+                        <th className="px-5 py-3">Started At</th>
+                        <th className="px-5 py-3">Submitted At</th>
+                        <th className="px-5 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {attemptsData.attempts.map((attempt: any) => {
+                        const student = attempt.student;
+                        return (
+                          <tr key={attempt.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-5 py-3.5">
+                              <div className="font-bold text-slate-200 font-mono">
+                                {student?.registrationNumber || 'N/A'}
+                              </div>
+                              <div className="text-slate-400 text-[11px]">
+                                {student ? `${student.firstName} ${student.lastName}` : 'Unknown Student'}
+                              </div>
+                              <div className="text-slate-500 text-[10px]">{student?.email}</div>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {attempt.status === 'IN_PROGRESS' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  IN PROGRESS
+                                </span>
+                              )}
+                              {attempt.status === 'SUBMITTED' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  SUBMITTED
+                                </span>
+                              )}
+                              {attempt.status === 'AUTO_SUBMITTED' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                  AUTO SUBMITTED
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <div className="font-bold text-slate-200">
+                                {attempt.score.toFixed(1)} pts
+                              </div>
+                              <div className="text-emerald-400 font-extrabold text-[11px]">
+                                {attempt.percentage.toFixed(1)}%
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-400 text-[11px]">
+                              {new Date(attempt.startedAt).toLocaleString()}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-400 text-[11px]">
+                              {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : '—'}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <button
+                                onClick={() => {
+                                  setSelectedAttempt(attempt);
+                                  setDeleteAttemptModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded transition-all inline-flex items-center space-x-1"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Reset</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="p-4 bg-slate-900/40 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+                  <div>
+                    Showing <span className="font-bold text-slate-200">{(attemptsPage - 1) * attemptsLimit + 1}</span> to{' '}
+                    <span className="font-bold text-slate-200">{Math.min(attemptsPage * attemptsLimit, attemptsData.total)}</span> of{' '}
+                    <span className="font-bold text-slate-200">{attemptsData.total}</span> attempts
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      disabled={attemptsPage <= 1}
+                      onClick={() => setAttemptsPage((prev) => Math.max(prev - 1, 1))}
+                      className="px-3 py-1.5 glass-btn-secondary text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    
+                    <span className="px-3 py-1 text-slate-300 font-mono">
+                      Page {attemptsPage} of {attemptsData.totalPages || 1}
+                    </span>
+
+                    <button
+                      disabled={attemptsPage >= attemptsData.totalPages}
+                      onClick={() => setAttemptsPage((prev) => prev + 1)}
+                      className="px-3 py-1.5 glass-btn-secondary text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1254,6 +1504,89 @@ const ExamDetails: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* DELETE SINGLE ATTEMPT MODAL */}
+      {deleteAttemptModalOpen && selectedAttempt && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150 text-left border-red-500/30">
+            <div className="flex items-center space-x-3 text-red-400">
+              <AlertCircle className="h-6 w-6 shrink-0" />
+              <h3 className="text-lg font-bold">Reset Student Attempt</h3>
+            </div>
+            
+            <p className="text-slate-300 text-xs leading-relaxed">
+              Are you sure you want to reset/delete the attempt for{' '}
+              <strong className="text-slate-100 font-mono">
+                {selectedAttempt.student?.registrationNumber} ({selectedAttempt.student?.firstName} {selectedAttempt.student?.lastName})
+              </strong>?
+            </p>
+
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-300 space-y-1">
+              <p>• All saved answers and score data for this attempt will be deleted.</p>
+              <p>• The student will be able to start a fresh attempt immediately.</p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAttemptModalOpen(false)}
+                className="glass-btn-secondary py-2 px-4 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteAttemptMutation.isPending}
+                onClick={() => deleteAttemptMutation.mutate(selectedAttempt.id)}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
+              >
+                {deleteAttemptMutation.isPending ? 'Resetting...' : 'Confirm Reset Attempt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE ALL ATTEMPTS MODAL */}
+      {deleteAllAttemptsModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150 text-left border-red-500/40">
+            <div className="flex items-center space-x-3 text-red-400">
+              <RotateCcw className="h-6 w-6 shrink-0" />
+              <h3 className="text-lg font-bold">Reset ALL Student Attempts</h3>
+            </div>
+            
+            <p className="text-slate-300 text-xs leading-relaxed">
+              Are you sure you want to reset <strong className="text-red-400">ALL attempts</strong> for this examination?
+            </p>
+
+            <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-lg text-xs text-red-300 space-y-1">
+              <p className="font-bold text-red-200">Warning: Irreversible Action!</p>
+              <p>• All stored student attempts and graded results will be permanently removed.</p>
+              <p>• Exam locks will be cleared, allowing setup changes if needed.</p>
+              <p>• Eligible students can start brand new attempts.</p>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteAllAttemptsModalOpen(false)}
+                className="glass-btn-secondary py-2 px-4 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteAllAttemptsMutation.isPending}
+                onClick={() => deleteAllAttemptsMutation.mutate()}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
+              >
+                {deleteAllAttemptsMutation.isPending ? 'Resetting All...' : 'Confirm Reset All Attempts'}
+              </button>
+            </div>
           </div>
         </div>
       )}
