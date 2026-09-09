@@ -333,7 +333,7 @@ const CourseDetails: React.FC = () => {
                         ? new Date(formData.scheduledStart)
                         : null
                     }
-                    onChange={(date) => {
+                    onChange={(date: Date | null) => {
                       handleFormChange(
                         "scheduledStart",
                         date ? date.toISOString() : "",
@@ -360,12 +360,17 @@ const CourseDetails: React.FC = () => {
                         ? new Date(formData.scheduledEnd)
                         : null
                     }
-                    onChange={(date) => {
+                    onChange={(date: Date | null) => {
                       handleFormChange(
                         "scheduledEnd",
                         date ? date.toISOString() : "",
                       );
                     }}
+                    minDate={
+                      formData.scheduledStart
+                        ? new Date(formData.scheduledStart)
+                        : undefined
+                    }
                     showTimeSelect
                     timeFormat="HH:mm"
                     timeIntervals={15}
