@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExamParticipantDto } from './dto/create-participant.dto';
 import { ExamService } from './exam.service';
@@ -14,18 +19,26 @@ export class ExamParticipantService {
   ) {}
 
   async addParticipant(dto: CreateExamParticipantDto, user: User) {
-    const exam = await this.prisma.exam.findUnique({ where: { id: dto.examId } });
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: dto.examId },
+    });
     if (!exam) {
       throw new NotFoundException(`Exam with ID ${dto.examId} not found`);
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only manage participants for exams you created');
+      throw new ForbiddenException(
+        'You can only manage participants for exams you created',
+      );
     }
 
-    const student = await this.prisma.user.findUnique({ where: { id: dto.studentId } });
+    const student = await this.prisma.user.findUnique({
+      where: { id: dto.studentId },
+    });
     if (!student) {
-      throw new NotFoundException(`Student user with ID ${dto.studentId} not found`);
+      throw new NotFoundException(
+        `Student user with ID ${dto.studentId} not found`,
+      );
     }
     if (student.role !== Role.STUDENT) {
       throw new BadRequestException('The selected user is not a student');
@@ -40,14 +53,21 @@ export class ExamParticipantService {
       },
     });
     if (existing) {
-      throw new BadRequestException('Student is already registered as an eligible participant for this exam');
+      throw new BadRequestException(
+        'Student is already registered as an eligible participant for this exam',
+      );
     }
 
     return this.prisma.examParticipant.create({
       data: dto,
       include: {
         student: {
-          select: { id: true, firstName: true, lastName: true, registrationNumber: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            registrationNumber: true,
+          },
         },
       },
     });
@@ -55,12 +75,18 @@ export class ExamParticipantService {
 
   async getParticipants(examId: string, user: User) {
     await this.examService.findOne(examId, user); // check access
-    
+
     return this.prisma.examParticipant.findMany({
       where: { examId },
       include: {
         student: {
-          select: { id: true, firstName: true, lastName: true, registrationNumber: true, email: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            registrationNumber: true,
+            email: true,
+          },
         },
       },
     });
@@ -73,7 +99,9 @@ export class ExamParticipantService {
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only manage participants for exams you created');
+      throw new ForbiddenException(
+        'You can only manage participants for exams you created',
+      );
     }
 
     const attempt = await this.prisma.examAttempt.findUnique({
@@ -82,7 +110,9 @@ export class ExamParticipantService {
       },
     });
     if (attempt) {
-      throw new BadRequestException('Cannot remove student from participants because they have already started an attempt');
+      throw new BadRequestException(
+        'Cannot remove student from participants because they have already started an attempt',
+      );
     }
 
     await this.prisma.examParticipant.delete({
@@ -101,7 +131,9 @@ export class ExamParticipantService {
     const worksheet = workbook.getWorksheet(1);
 
     if (!worksheet) {
-      throw new BadRequestException('Excel file must contain at least one worksheet');
+      throw new BadRequestException(
+        'Excel file must contain at least one worksheet',
+      );
     }
 
     const rows: any[] = [];
@@ -120,10 +152,18 @@ export class ExamParticipantService {
       }
     });
 
-    const required = ['registration number', 'first name', 'last name', 'email', 'department code'];
+    const required = [
+      'registration number',
+      'first name',
+      'last name',
+      'email',
+      'department code',
+    ];
     for (const req of required) {
       if (!headers.includes(req)) {
-        throw new BadRequestException(`Excel sheet is missing required column: "${req}"`);
+        throw new BadRequestException(
+          `Excel sheet is missing required column: "${req}"`,
+        );
       }
     }
 
@@ -135,29 +175,43 @@ export class ExamParticipantService {
         const regNum = String(data['registration number'] || '').trim();
         const firstName = String(data['first name'] || '').trim();
         const lastName = String(data['last name'] || '').trim();
-        const email = String(data['email'] || '').trim().toLowerCase();
-        const deptCode = String(data['department code'] || '').trim().toUpperCase();
+        const email = String(data['email'] || '')
+          .trim()
+          .toLowerCase();
+        const deptCode = String(data['department code'] || '')
+          .trim()
+          .toUpperCase();
 
         if (!regNum || !firstName || !lastName || !email || !deptCode) {
           errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
           continue;
         }
 
-        const dept = await tx.department.findUnique({ where: { code: deptCode } });
+        const dept = await tx.department.findUnique({
+          where: { code: deptCode },
+        });
         if (!dept) {
-          errors.push(`Row ${rowNumber}: Department code "${deptCode}" does not exist.`);
+          errors.push(
+            `Row ${rowNumber}: Department code "${deptCode}" does not exist.`,
+          );
           continue;
         }
 
-        const existingReg = await tx.user.findUnique({ where: { registrationNumber: regNum } });
+        const existingReg = await tx.user.findUnique({
+          where: { registrationNumber: regNum },
+        });
         if (existingReg) {
-          errors.push(`Row ${rowNumber}: Registration number "${regNum}" is already registered.`);
+          errors.push(
+            `Row ${rowNumber}: Registration number "${regNum}" is already registered.`,
+          );
           continue;
         }
 
         const existingEmail = await tx.user.findUnique({ where: { email } });
         if (existingEmail) {
-          errors.push(`Row ${rowNumber}: Email "${email}" is already registered.`);
+          errors.push(
+            `Row ${rowNumber}: Email "${email}" is already registered.`,
+          );
           continue;
         }
 
@@ -188,21 +242,29 @@ export class ExamParticipantService {
   }
 
   // Lecturer: Excel exam participant import
-  async importParticipantsExcel(examId: string, fileBuffer: Buffer, user: User) {
+  async importParticipantsExcel(
+    examId: string,
+    fileBuffer: Buffer,
+    user: User,
+  ) {
     const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
     if (!exam) {
       throw new NotFoundException(`Exam with ID ${examId} not found`);
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only import participants for exams you created');
+      throw new ForbiddenException(
+        'You can only import participants for exams you created',
+      );
     }
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer as any);
     const worksheet = workbook.getWorksheet(1);
     if (!worksheet) {
-      throw new BadRequestException('Excel file must contain at least one worksheet');
+      throw new BadRequestException(
+        'Excel file must contain at least one worksheet',
+      );
     }
 
     let headers: string[] = [];
@@ -221,13 +283,17 @@ export class ExamParticipantService {
     });
 
     if (!headers.includes('registration number')) {
-      throw new BadRequestException('Excel sheet is missing required column: "registration number"');
+      throw new BadRequestException(
+        'Excel sheet is missing required column: "registration number"',
+      );
     }
 
     const uniqueRegNumsInExcel = Array.from(new Set(registrationNumbers));
 
     if (uniqueRegNumsInExcel.length === 0) {
-      throw new BadRequestException('No student registration numbers found in the Excel file');
+      throw new BadRequestException(
+        'No student registration numbers found in the Excel file',
+      );
     }
 
     const unmatched: string[] = [];
@@ -250,7 +316,8 @@ export class ExamParticipantService {
 
     if (unmatched.length > 0) {
       throw new BadRequestException({
-        message: 'Import rejected because some registration numbers do not exist as students in the system.',
+        message:
+          'Import rejected because some registration numbers do not exist as students in the system.',
         unmatchedCount: unmatched.length,
         unmatchedRecords: unmatched,
       });
@@ -310,7 +377,9 @@ export class ExamParticipantService {
     }
 
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only export results for exams you created');
+      throw new ForbiddenException(
+        'You can only export results for exams you created',
+      );
     }
 
     // Compute default maximum exam points from config (used for NOT_ATTEMPTED students)
@@ -319,7 +388,8 @@ export class ExamParticipantService {
       // Find all gaps in this topic
       const gaps = config.topic.questions.flatMap((q) => q.gaps);
       // Average points per gap
-      const avgGapPoints = gaps.reduce((sum, g) => sum + g.points, 0) / (gaps.length || 1);
+      const avgGapPoints =
+        gaps.reduce((sum, g) => sum + g.points, 0) / (gaps.length || 1);
       // Estimate max points = config questionCount * avgGapPoints * average gaps per question
       // To be clean, if questions are uniform, we estimate.
       // But a better approach is to sum points of the first K questions in topic blocks.
@@ -330,7 +400,10 @@ export class ExamParticipantService {
         return bGapsPoints - aGapsPoints; // sort descending to show max possible points safely
       });
       const topK = sortedQuestions.slice(0, config.questionCount);
-      const topKPoints = topK.reduce((sum, q) => sum + q.gaps.reduce((s, g) => s + g.points, 0), 0);
+      const topKPoints = topK.reduce(
+        (sum, q) => sum + q.gaps.reduce((s, g) => s + g.points, 0),
+        0,
+      );
       defaultMaxPoints += topKPoints;
     });
 
@@ -374,7 +447,12 @@ export class ExamParticipantService {
     worksheet.mergeCells('A1:H1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `${exam.course.code} - ${exam.title} (${exam.academicYear} ${exam.session} Session)`;
-    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.font = {
+      name: 'Arial',
+      size: 16,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
     titleCell.fill = {
       type: 'pattern',
       pattern: 'solid',
@@ -395,13 +473,18 @@ export class ExamParticipantService {
       'Examination Status',
     ];
     worksheet.addRow(headers);
-    
+
     const headerRow = worksheet.getRow(2);
     headerRow.height = 25;
-    
+
     // Style Header Cells
     headerRow.eachCell((cell) => {
-      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.font = {
+        name: 'Arial',
+        size: 11,
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+      };
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -438,7 +521,9 @@ export class ExamParticipantService {
           return sum + aq.question.gaps.reduce((s, g) => s + g.points, 0);
         }, 0);
         percentage = attempt.percentage / 100; // stored in db as 0-100, we divide by 100 for Excel format percentage
-        submissionTimeStr = attempt.submittedAt ? attempt.submittedAt.toLocaleString() : 'In Progress';
+        submissionTimeStr = attempt.submittedAt
+          ? attempt.submittedAt.toLocaleString()
+          : 'In Progress';
         status = attempt.status;
       }
 
@@ -508,7 +593,7 @@ export class ExamParticipantService {
       column.width = Math.max(maxLen + 4, 12);
     });
 
-    const buffer = Buffer.from(await workbook.xlsx.writeBuffer() as any);
+    const buffer = Buffer.from((await workbook.xlsx.writeBuffer()) as any);
     return buffer;
   }
 }

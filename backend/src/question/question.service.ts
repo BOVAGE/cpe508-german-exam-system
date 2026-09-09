@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuestionDto, CreateGapDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -27,38 +32,51 @@ export class QuestionService {
   private validateGapsWithText(text: string, gaps: CreateGapDto[]) {
     const textPositions = this.extractGapPositions(text);
     if (textPositions.length === 0) {
-      throw new BadRequestException('Question text must contain at least one gap placeholder in the format {{gap:1}}');
+      throw new BadRequestException(
+        'Question text must contain at least one gap placeholder in the format {{gap:1}}',
+      );
     }
 
     // Check for duplicates in text placeholders
     const uniqueTextPositions = new Set(textPositions);
     if (uniqueTextPositions.size !== textPositions.length) {
-      throw new BadRequestException('Duplicate gap placeholders found in question text');
+      throw new BadRequestException(
+        'Duplicate gap placeholders found in question text',
+      );
     }
 
     const dtoPositions = gaps.map((g) => g.position);
     const uniqueDtoPositions = new Set(dtoPositions);
 
     if (uniqueDtoPositions.size !== dtoPositions.length) {
-      throw new BadRequestException('Duplicate gap positions provided in gaps list');
+      throw new BadRequestException(
+        'Duplicate gap positions provided in gaps list',
+      );
     }
 
     // Verify DTO positions match text positions exactly
     for (const pos of textPositions) {
       if (!uniqueDtoPositions.has(pos)) {
-        throw new BadRequestException(`Missing gap configuration for position ${pos} found in text`);
+        throw new BadRequestException(
+          `Missing gap configuration for position ${pos} found in text`,
+        );
       }
     }
 
     for (const pos of dtoPositions) {
       if (!uniqueTextPositions.has(pos)) {
-        throw new BadRequestException(`Configuration provided for gap position ${pos} which does not exist in question text`);
+        throw new BadRequestException(
+          `Configuration provided for gap position ${pos} which does not exist in question text`,
+        );
       }
     }
   }
 
   // Helper: Cycle detection in previousQuestionId pointers
-  private async checkCircularDependency(currentQuestionId: string | null, newPreviousId: string | null) {
+  private async checkCircularDependency(
+    currentQuestionId: string | null,
+    newPreviousId: string | null,
+  ) {
     if (!newPreviousId) return;
     let traceId: string | null | undefined = newPreviousId;
     const visited = new Set<string>();
@@ -69,7 +87,9 @@ export class QuestionService {
 
     while (traceId) {
       if (visited.has(traceId)) {
-        throw new BadRequestException('Circular question dependency chain detected');
+        throw new BadRequestException(
+          'Circular question dependency chain detected',
+        );
       }
       visited.add(traceId);
 
@@ -82,7 +102,10 @@ export class QuestionService {
   }
 
   // Helper: Validate dependency topic match
-  private async validateDependencyTopic(dtoTopicId: string, prevQuestionId: string | null) {
+  private async validateDependencyTopic(
+    dtoTopicId: string,
+    prevQuestionId: string | null,
+  ) {
     if (!prevQuestionId) return;
 
     const prevQuestion = await this.prisma.question.findUnique({
@@ -91,11 +114,15 @@ export class QuestionService {
     });
 
     if (!prevQuestion) {
-      throw new NotFoundException(`Previous question with ID ${prevQuestionId} not found`);
+      throw new NotFoundException(
+        `Previous question with ID ${prevQuestionId} not found`,
+      );
     }
 
     if (prevQuestion.topicId !== dtoTopicId) {
-      throw new BadRequestException('Dependent questions must belong to the same Topic');
+      throw new BadRequestException(
+        'Dependent questions must belong to the same Topic',
+      );
     }
   }
 
@@ -111,7 +138,9 @@ export class QuestionService {
 
     // 2. Authorization
     if (user.role === Role.LECTURER && topic.exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only manage questions for exams you created');
+      throw new ForbiddenException(
+        'You can only manage questions for exams you created',
+      );
     }
 
     // 3. Exam lock state validation
@@ -237,20 +266,29 @@ export class QuestionService {
     }
 
     // Authorization
-    if (user.role === Role.LECTURER && question.topic.exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only update questions for exams you created');
+    if (
+      user.role === Role.LECTURER &&
+      question.topic.exam.createdById !== user.id
+    ) {
+      throw new ForbiddenException(
+        'You can only update questions for exams you created',
+      );
     }
 
     // Lock check
     await this.examService.checkExamLocked(question.topic.examId);
 
     // Validate date/text placeholders if both or either updated
-    const textToValidate = dto.questionText !== undefined ? dto.questionText : question.questionText;
-    const gapsToValidate = dto.gaps !== undefined ? dto.gaps : question.gaps.map((g) => ({
-      position: g.position,
-      points: g.points,
-      acceptedAnswers: [], // not needed for structure validation
-    }));
+    const textToValidate =
+      dto.questionText !== undefined ? dto.questionText : question.questionText;
+    const gapsToValidate =
+      dto.gaps !== undefined
+        ? dto.gaps
+        : question.gaps.map((g) => ({
+            position: g.position,
+            points: g.points,
+            acceptedAnswers: [], // not needed for structure validation
+          }));
 
     if (dto.questionText !== undefined || dto.gaps !== undefined) {
       this.validateGapsWithText(textToValidate, gapsToValidate);
@@ -262,10 +300,14 @@ export class QuestionService {
         where: { id: dto.topicId },
       });
       if (!targetTopic) {
-        throw new NotFoundException(`Target Topic with ID ${dto.topicId} not found`);
+        throw new NotFoundException(
+          `Target Topic with ID ${dto.topicId} not found`,
+        );
       }
       if (targetTopic.examId !== question.topic.examId) {
-        throw new BadRequestException('Cannot move a question to a topic in a different exam');
+        throw new BadRequestException(
+          'Cannot move a question to a topic in a different exam',
+        );
       }
 
       // Check if any other question depends on this one
@@ -274,13 +316,19 @@ export class QuestionService {
         select: { id: true },
       });
       if (dependentChild) {
-        throw new BadRequestException('Cannot change topic of a question that has dependent child questions in the original topic');
+        throw new BadRequestException(
+          'Cannot change topic of a question that has dependent child questions in the original topic',
+        );
       }
     }
 
     // Validate dependencies
-    const targetTopicId = dto.topicId !== undefined ? dto.topicId : question.topicId;
-    const targetPrevId = dto.previousQuestionId !== undefined ? dto.previousQuestionId : question.previousQuestionId;
+    const targetTopicId =
+      dto.topicId !== undefined ? dto.topicId : question.topicId;
+    const targetPrevId =
+      dto.previousQuestionId !== undefined
+        ? dto.previousQuestionId
+        : question.previousQuestionId;
 
     if (targetPrevId) {
       if (targetPrevId === id) {
@@ -320,7 +368,10 @@ export class QuestionService {
         where: { id },
         data: {
           questionText: dto.questionText,
-          previousQuestionId: dto.previousQuestionId !== undefined ? dto.previousQuestionId : undefined,
+          previousQuestionId:
+            dto.previousQuestionId !== undefined
+              ? dto.previousQuestionId
+              : undefined,
           topicId: dto.topicId !== undefined ? dto.topicId : undefined,
         },
         include: {
@@ -345,8 +396,13 @@ export class QuestionService {
     }
 
     // Authorization
-    if (user.role === Role.LECTURER && question.topic.exam.createdById !== user.id) {
-      throw new ForbiddenException('You can only delete questions for exams you created');
+    if (
+      user.role === Role.LECTURER &&
+      question.topic.exam.createdById !== user.id
+    ) {
+      throw new ForbiddenException(
+        'You can only delete questions for exams you created',
+      );
     }
 
     // Lock check

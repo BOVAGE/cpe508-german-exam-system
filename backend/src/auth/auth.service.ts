@@ -1,10 +1,15 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { Role, User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -15,7 +20,7 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    let user: any = null;
+    let user: User | null = null;
 
     // Try finding by email or registration number
     if (dto.identifier.includes('@')) {
@@ -26,13 +31,19 @@ export class AuthService {
 
     // fallback: try both in case registration number contains @ or vice versa
     if (!user) {
-      user = await this.usersService.findByEmail(dto.identifier) || 
-             await this.usersService.findByRegistrationNumber(dto.identifier);
+      user =
+        (await this.usersService.findByEmail(dto.identifier)) ||
+        (await this.usersService.findByRegistrationNumber(dto.identifier));
     }
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    if (user.firstTimeLogin === true && user.role === Role.STUDENT)
+      throw new UnauthorizedException(
+        'First time login detected. Please proceed to change your password.',
+      );
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
@@ -68,7 +79,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const isOldPasswordValid = await bcrypt.compare(dto.oldPassword, user.password);
+    const isOldPasswordValid = await bcrypt.compare(
+      dto.oldPassword,
+      user.password,
+    );
     if (!isOldPasswordValid) {
       throw new BadRequestException('Incorrect current password');
     }

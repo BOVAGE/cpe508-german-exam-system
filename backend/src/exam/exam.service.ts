@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
@@ -23,13 +28,15 @@ export class ExamService {
       });
       if (!assignment) {
         throw new ForbiddenException(
-          `You are not assigned to teach this course (${dto.courseId}) in the academic year ${dto.academicYear} (${dto.session} session).`
+          `You are not assigned to teach this course (${dto.courseId}) in the academic year ${dto.academicYear} (${dto.session} session).`,
         );
       }
     }
 
     // 2. Verify course exists
-    const course = await this.prisma.course.findUnique({ where: { id: dto.courseId } });
+    const course = await this.prisma.course.findUnique({
+      where: { id: dto.courseId },
+    });
     if (!course) {
       throw new NotFoundException(`Course with ID ${dto.courseId} not found`);
     }
@@ -38,7 +45,9 @@ export class ExamService {
     const start = new Date(dto.scheduledStart);
     const end = new Date(dto.scheduledEnd);
     if (start >= end) {
-      throw new BadRequestException('scheduledStart must be earlier than scheduledEnd');
+      throw new BadRequestException(
+        'scheduledStart must be earlier than scheduledEnd',
+      );
     }
 
     // 4. Create the exam
@@ -65,7 +74,10 @@ export class ExamService {
   async findAll(user: User) {
     if (user.role === Role.ADMIN) {
       return this.prisma.exam.findMany({
-        include: { course: true, creator: { select: { firstName: true, lastName: true } } },
+        include: {
+          course: true,
+          creator: { select: { firstName: true, lastName: true } },
+        },
       });
     }
 
@@ -83,7 +95,10 @@ export class ExamService {
             { courseId: { in: assignedCourseIds } },
           ],
         },
-        include: { course: true, creator: { select: { firstName: true, lastName: true } } },
+        include: {
+          course: true,
+          creator: { select: { firstName: true, lastName: true } },
+        },
       });
     }
 
@@ -108,7 +123,9 @@ export class ExamService {
       where: { id },
       include: {
         course: true,
-        creator: { select: { id: true, firstName: true, lastName: true, email: true } },
+        creator: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         topics: {
           include: {
             questions: {
@@ -138,12 +155,14 @@ export class ExamService {
         where: { examId_studentId: { examId: id, studentId: user.id } },
       });
       if (!isParticipant) {
-        throw new ForbiddenException('You are not registered to take this exam');
+        throw new ForbiddenException(
+          'You are not registered to take this exam',
+        );
       }
       if (exam.status !== ExamStatus.PUBLISHED) {
         throw new ForbiddenException('This exam is not yet available');
       }
-      
+
       // For students, we strip details like correct answers!
       // This is a critical security rule: never return accepted answers to a student.
       exam.topics.forEach((topic) => {
@@ -170,26 +189,41 @@ export class ExamService {
     }
 
     // Check if attempts exist (Locking Model)
-    const attemptsCount = await this.prisma.examAttempt.count({ where: { examId: id } });
+    const attemptsCount = await this.prisma.examAttempt.count({
+      where: { examId: id },
+    });
     const hasAttempts = attemptsCount > 0;
 
     if (hasAttempts) {
       // Core configuration locks
       if (dto.duration !== undefined && dto.duration !== exam.duration) {
-        throw new BadRequestException('Cannot modify exam duration once attempts have started');
+        throw new BadRequestException(
+          'Cannot modify exam duration once attempts have started',
+        );
       }
-      if (dto.gradingMode !== undefined && dto.gradingMode !== exam.gradingMode) {
-        throw new BadRequestException('Cannot modify grading mode once attempts have started');
+      if (
+        dto.gradingMode !== undefined &&
+        dto.gradingMode !== exam.gradingMode
+      ) {
+        throw new BadRequestException(
+          'Cannot modify grading mode once attempts have started',
+        );
       }
       if (dto.examKind !== undefined && dto.examKind !== exam.examKind) {
-        throw new BadRequestException('Cannot modify exam kind once attempts have started');
+        throw new BadRequestException(
+          'Cannot modify exam kind once attempts have started',
+        );
       }
       if (dto.academicYear || dto.session) {
-        throw new BadRequestException('Cannot modify academic year or session once attempts have started');
+        throw new BadRequestException(
+          'Cannot modify academic year or session once attempts have started',
+        );
       }
       // Cannot transition back to DRAFT once attempts exist
       if (dto.status === ExamStatus.DRAFT) {
-        throw new BadRequestException('Cannot set exam back to DRAFT status once attempts have started');
+        throw new BadRequestException(
+          'Cannot set exam back to DRAFT status once attempts have started',
+        );
       }
     }
 
@@ -201,7 +235,9 @@ export class ExamService {
     const start = data.scheduledStart || exam.scheduledStart;
     const end = data.scheduledEnd || exam.scheduledEnd;
     if (start >= end) {
-      throw new BadRequestException('scheduledStart must be earlier than scheduledEnd');
+      throw new BadRequestException(
+        'scheduledStart must be earlier than scheduledEnd',
+      );
     }
 
     return this.prisma.exam.update({
@@ -222,9 +258,13 @@ export class ExamService {
     }
 
     // Lock check
-    const attemptsCount = await this.prisma.examAttempt.count({ where: { examId: id } });
+    const attemptsCount = await this.prisma.examAttempt.count({
+      where: { examId: id },
+    });
     if (attemptsCount > 0) {
-      throw new BadRequestException('Cannot delete an exam that has active or completed student attempts');
+      throw new BadRequestException(
+        'Cannot delete an exam that has active or completed student attempts',
+      );
     }
 
     await this.prisma.exam.delete({ where: { id } });
@@ -233,9 +273,13 @@ export class ExamService {
 
   // Helper method for other services to check lock state
   async checkExamLocked(examId: string) {
-    const attemptsCount = await this.prisma.examAttempt.count({ where: { examId } });
+    const attemptsCount = await this.prisma.examAttempt.count({
+      where: { examId },
+    });
     if (attemptsCount > 0) {
-      throw new BadRequestException('This action is blocked because students have already started taking this exam');
+      throw new BadRequestException(
+        'This action is blocked because students have already started taking this exam',
+      );
     }
   }
 }

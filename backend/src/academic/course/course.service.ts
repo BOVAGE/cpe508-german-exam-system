@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -13,7 +17,9 @@ export class CourseService {
       where: { id: dto.departmentId },
     });
     if (!dept) {
-      throw new NotFoundException(`Department with ID ${dto.departmentId} not found`);
+      throw new NotFoundException(
+        `Department with ID ${dto.departmentId} not found`,
+      );
     }
 
     // Verify unique code
@@ -21,7 +27,9 @@ export class CourseService {
       where: { code: dto.code },
     });
     if (existing) {
-      throw new BadRequestException(`Course with code ${dto.code} already exists`);
+      throw new BadRequestException(
+        `Course with code ${dto.code} already exists`,
+      );
     }
 
     return this.prisma.course.create({
@@ -61,16 +69,24 @@ export class CourseService {
     }
 
     if (dto.departmentId) {
-      const dept = await this.prisma.department.findUnique({ where: { id: dto.departmentId } });
+      const dept = await this.prisma.department.findUnique({
+        where: { id: dto.departmentId },
+      });
       if (!dept) {
-        throw new NotFoundException(`Department with ID ${dto.departmentId} not found`);
+        throw new NotFoundException(
+          `Department with ID ${dto.departmentId} not found`,
+        );
       }
     }
 
     if (dto.code && dto.code !== course.code) {
-      const existing = await this.prisma.course.findUnique({ where: { code: dto.code } });
+      const existing = await this.prisma.course.findUnique({
+        where: { code: dto.code },
+      });
       if (existing) {
-        throw new BadRequestException(`Course with code ${dto.code} already exists`);
+        throw new BadRequestException(
+          `Course with code ${dto.code} already exists`,
+        );
       }
     }
 

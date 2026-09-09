@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateFacultyDto } from './dto/create-faculty.dto';
 import { UpdateFacultyDto } from './dto/update-faculty.dto';
@@ -10,15 +14,14 @@ export class FacultyService {
   async create(dto: CreateFacultyDto) {
     const existing = await this.prisma.faculty.findFirst({
       where: {
-        OR: [
-          { name: dto.name },
-          { code: dto.code },
-        ],
+        OR: [{ name: dto.name }, { code: dto.code }],
       },
     });
 
     if (existing) {
-      throw new BadRequestException('Faculty with this name or code already exists');
+      throw new BadRequestException(
+        'Faculty with this name or code already exists',
+      );
     }
 
     return this.prisma.faculty.create({
@@ -56,14 +59,18 @@ export class FacultyService {
     }
 
     if (dto.name && dto.name !== faculty.name) {
-      const existing = await this.prisma.faculty.findUnique({ where: { name: dto.name } });
+      const existing = await this.prisma.faculty.findUnique({
+        where: { name: dto.name },
+      });
       if (existing) {
         throw new BadRequestException('Faculty with this name already exists');
       }
     }
 
     if (dto.code && dto.code !== faculty.code) {
-      const existing = await this.prisma.faculty.findUnique({ where: { code: dto.code } });
+      const existing = await this.prisma.faculty.findUnique({
+        where: { code: dto.code },
+      });
       if (existing) {
         throw new BadRequestException('Faculty with this code already exists');
       }

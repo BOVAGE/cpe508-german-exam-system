@@ -23,8 +23,8 @@ export class GradingService {
           matrix[i][j] = Math.min(
             matrix[i - 1][j - 1] + 1, // substitution
             Math.min(
-              matrix[i][j - 1] + 1,   // insertion
-              matrix[i - 1][j] + 1,   // deletion
+              matrix[i][j - 1] + 1, // insertion
+              matrix[i - 1][j] + 1, // deletion
             ),
           );
         }
@@ -35,17 +35,23 @@ export class GradingService {
   }
 
   // Check if student answer matches any accepted answer
-  isAnswerCorrect(studentAns: string, acceptedAnswers: string[], mode: GradingMode): boolean {
+  isAnswerCorrect(
+    studentAns: string,
+    acceptedAnswers: string[],
+    mode: GradingMode,
+  ): boolean {
     if (acceptedAnswers.length === 0) return false;
 
     if (mode === GradingMode.STRICT) {
       const studentClean = studentAns.trim();
-      return acceptedAnswers.some((acceptedAns) => studentClean === acceptedAns.trim());
+      return acceptedAnswers.some(
+        (acceptedAns) => studentClean === acceptedAns.trim(),
+      );
     }
 
     // NON_STRICT Mode: lowercased, trimmed, spelling tolerance
     const s = studentAns.trim().toLowerCase();
-    
+
     return acceptedAnswers.some((acceptedAns) => {
       const a = acceptedAns.trim().toLowerCase();
       if (s === a) return true;
@@ -53,14 +59,14 @@ export class GradingService {
       // Distance calculation
       const dist = this.getLevenshteinDistance(s, a);
       const len = a.length;
-      
+
       // Spelling tolerance heuristic
       if (len < 4) {
         return dist === 0; // No tolerance for short words
       } else if (len >= 4 && len <= 7) {
-        return dist <= 1;   // 1 char tolerance
+        return dist <= 1; // 1 char tolerance
       } else {
-        return dist <= 2;   // 2 char tolerance
+        return dist <= 2; // 2 char tolerance
       }
     });
   }
