@@ -73,8 +73,8 @@ const LecturerDashboard: React.FC = () => {
         <div className="glass-panel p-12 text-center flex flex-col items-center justify-center space-y-4">
           <HelpCircle className="h-12 w-12 text-slate-600" />
           <div>
-            <h3 className="text-lg font-bold text-slate-300">No Courses Found</h3>
-            <p className="text-slate-500 text-sm mt-1">Please contact your administrator if courses are missing.</p>
+            <h3 className="text-lg font-bold text-slate-300">No Assigned Courses Found</h3>
+            <p className="text-slate-500 text-sm mt-1">You have not been assigned to any courses yet. Please contact your administrator to assign courses to you.</p>
           </div>
         </div>
       ) : (

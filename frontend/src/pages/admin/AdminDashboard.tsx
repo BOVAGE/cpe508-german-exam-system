@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../utils/api';
 import { 
@@ -15,12 +16,13 @@ import {
   UploadCloud, 
   CheckCircle, 
   AlertCircle,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'faculties' | 'departments' | 'courses' | 'lecturers' | 'students' | 'assignments'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'faculties' | 'departments' | 'courses' | 'exams' | 'lecturers' | 'students' | 'assignments'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Modals state
@@ -57,6 +59,14 @@ const AdminDashboard: React.FC = () => {
     queryKey: ['courses'],
     queryFn: async () => {
       const res = await api.get('/courses');
+      return res.data;
+    }
+  });
+
+  const { data: exams = [] } = useQuery({
+    queryKey: ['exams'],
+    queryFn: async () => {
+      const res = await api.get('/exams');
       return res.data;
     }
   });
@@ -294,6 +304,7 @@ const AdminDashboard: React.FC = () => {
           { key: 'faculties', label: 'Faculties', icon: Building2 },
           { key: 'departments', label: 'Departments', icon: Building2 },
           { key: 'courses', label: 'Courses', icon: BookOpen },
+          { key: 'exams', label: 'Examinations', icon: FileText },
           { key: 'lecturers', label: 'Lecturers', icon: Users },
           { key: 'students', label: 'Students', icon: Users },
           { key: 'assignments', label: 'Course Assignments', icon: UserPlus },
@@ -487,6 +498,63 @@ const AdminDashboard: React.FC = () => {
                       <button onClick={() => handleOpenDelete('course', course)} className="p-1.5 hover:bg-slate-800 text-red-500/80 hover:text-red-400 rounded">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* EXAMINATIONS DIRECTORY TAB */}
+        {activeTab === 'exams' && (
+          <div className="glass-panel overflow-hidden">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-sm text-slate-300">System Examinations Directory</h2>
+                <p className="text-slate-500 text-xs mt-0.5">Select any examination to inspect topics, questions, setup, or manage student attempts.</p>
+              </div>
+            </div>
+
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase border-b border-slate-800">
+                <tr>
+                  <th className="p-4">Exam Title</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Duration</th>
+                  <th className="p-4">Academic Year</th>
+                  <th className="p-4">Grading Mode</th>
+                  <th className="p-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filterList(exams, ['title', 'academicYear', 'session', 'status']).map((exam: any) => (
+                  <tr key={exam.id} className="hover:bg-slate-900/20">
+                    <td className="p-4">
+                      <div className="font-bold text-slate-200">{exam.title}</div>
+                      <div className="text-slate-400 text-xs">{exam.session ? `${exam.session} Session` : ''}</div>
+                    </td>
+                    <td className="p-4">
+                      {exam.status === 'PUBLISHED' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          PUBLISHED
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                          DRAFT
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 font-mono text-xs text-indigo-400">{exam.duration} mins</td>
+                    <td className="p-4 text-slate-400 text-xs">{exam.academicYear || 'N/A'}</td>
+                    <td className="p-4 text-slate-400 text-xs font-mono">{exam.gradingMode}</td>
+                    <td className="p-4 text-right">
+                      <Link
+                        to={`/admin/exams/${exam.id}`}
+                        className="glass-btn-secondary px-3 py-1.5 text-xs inline-flex items-center space-x-1"
+                      >
+                        <span>Manage & Attempts</span>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -894,7 +962,7 @@ const AdminDashboard: React.FC = () => {
                 Upload an Excel spreadsheet (`.xlsx`) containing student details. The sheet columns must match:
                 <br />
                 <span className="font-mono bg-slate-950 px-1 py-0.5 border border-slate-800 rounded mt-1 inline-block">
-                  email | registrationNumber | password | firstName | lastName | departmentCode
+                  email | registrationNumber | firstName | lastName | departmentCode
                 </span>
               </p>
 
@@ -942,17 +1010,22 @@ const AdminDashboard: React.FC = () => {
                     <AlertCircle className="h-5 w-5 text-red-400" />
                     <div>
                       <p className="text-slate-400">Failed / Duplicates</p>
-                      <p className="text-lg font-bold text-red-400">{importResult.errorCount ?? 0}</p>
+                      <p className="text-lg font-bold text-red-400">
+                        {importResult.errors?.length ?? importResult.errorCount ?? 0}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {importResult.errors && importResult.errors.length > 0 && (
                   <div className="max-h-48 overflow-y-auto bg-slate-950/60 border border-slate-900 rounded-lg p-3 space-y-1.5 text-[11px] font-mono">
-                    <p className="text-red-400 font-bold mb-1 border-b border-slate-800 pb-1">Unmatched Errors Details:</p>
+                    <p className="text-red-400 font-bold mb-1 border-b border-slate-800 pb-1">Import Errors Details:</p>
                     {importResult.errors.map((err: any, idx: number) => (
-                      <p key={idx} className="text-slate-400">
-                        Row {err.row}: <span className="text-red-400">{err.message || err.error}</span>
+                      <p key={idx} className="text-red-400">
+                        {typeof err === 'string' 
+                          ? err 
+                          : `Row ${err.row || err.rowNumber || '?'}: ${err.message || err.error}`
+                        }
                       </p>
                     ))}
                   </div>

@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import type { User } from '@prisma/client';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Academic Structure - Courses')
@@ -26,18 +28,19 @@ export class CourseController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get list of all courses (All Roles)' })
+  @ApiOperation({ summary: 'Get list of courses (Filtered by assignment for Lecturers)' })
   @ApiResponse({ status: 200, description: 'List of courses retrieved' })
-  findAll() {
-    return this.courseService.findAll();
+  findAll(@CurrentUser() user: User) {
+    return this.courseService.findAll(user);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get specific course details (All Roles)' })
+  @ApiOperation({ summary: 'Get specific course details (Enforces Lecturer assignment access)' })
   @ApiResponse({ status: 200, description: 'Course details' })
+  @ApiResponse({ status: 403, description: 'Forbidden if lecturer is not assigned' })
   @ApiResponse({ status: 404, description: 'Course not found' })
-  findOne(@Param('id') id: string) {
-    return this.courseService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.courseService.findOne(id, user);
   }
 
   @Patch(':id')
