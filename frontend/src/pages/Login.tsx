@@ -1,17 +1,27 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { GraduationCap, Lock, Mail, AlertCircle, Copy, Check } from 'lucide-react';
+import React, { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  GraduationCap,
+  Lock,
+  Mail,
+  AlertCircle,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Read redirect target from routing state
   const from = location.state?.from?.pathname || null;
@@ -19,7 +29,7 @@ const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier || !password) {
-      setError('Please fill in all credentials.');
+      setError("Please fill in all credentials.");
       return;
     }
 
@@ -28,22 +38,22 @@ const Login: React.FC = () => {
 
     try {
       const profile = await login(identifier, password);
-      
+
       // Determine redirection target based on role
       if (from) {
         navigate(from, { replace: true });
       } else {
         const dest = {
-          ADMIN: '/admin/dashboard',
-          LECTURER: '/lecturer/dashboard',
-          STUDENT: '/student/dashboard',
+          ADMIN: "/admin/dashboard",
+          LECTURER: "/lecturer/dashboard",
+          STUDENT: "/student/dashboard",
         }[profile.role];
-        navigate(dest || '/login', { replace: true });
+        navigate(dest || "/login", { replace: true });
       }
     } catch (err: any) {
       setError(
-        err.response?.data?.message || 
-        'Invalid identifier or password. Please verify your credentials.'
+        err.response?.data?.message ||
+          "Invalid identifier or password. Please verify your credentials.",
       );
     } finally {
       setLoading(false);
@@ -70,59 +80,91 @@ const Login: React.FC = () => {
               <GraduationCap className="h-8 w-8" />
             </div>
             <div>
-              <span className="text-xs uppercase font-extrabold tracking-widest text-indigo-400">CPE 508 Project</span>
-              <h1 className="text-2xl font-black bg-gradient-to-r from-slate-100 to-indigo-300 bg-clip-text text-transparent">GAP Examination System</h1>
+              <span className="text-xs uppercase font-extrabold tracking-widest text-indigo-400">
+                CPE 508 Project
+              </span>
+              <h1 className="text-2xl font-black bg-gradient-to-r from-slate-100 to-indigo-300 bg-clip-text text-transparent">
+                GAP Examination System
+              </h1>
             </div>
           </div>
-          
+
           <p className="text-slate-400 text-sm leading-relaxed max-w-md">
-            A premium, secure university portal for fill-in-the-gap examinations featuring linear chain dependencies, real-time autosaves, and automated grading modes.
+            A premium, secure university portal for fill-in-the-gap examinations
+            featuring linear chain dependencies, real-time autosaves, and
+            automated grading modes.
           </p>
 
           {/* Seeded credentials helper panel */}
           <div className="glass-panel p-6 space-y-4">
-            <h2 className="text-sm font-bold text-slate-300 tracking-wide uppercase border-b border-slate-800 pb-2">Seeded Test Credentials</h2>
-            
+            <h2 className="text-sm font-bold text-slate-300 tracking-wide uppercase border-b border-slate-800 pb-2">
+              Seeded Test Credentials
+            </h2>
+
             <div className="space-y-3">
               {/* Admin */}
               <div className="flex justify-between items-center text-xs p-2 bg-slate-950/40 rounded border border-slate-800/60">
                 <div>
                   <p className="font-bold text-slate-400">System Admin</p>
-                  <p className="font-mono text-slate-300 mt-0.5">admin@gap.edu / adminpassword123</p>
+                  <p className="font-mono text-slate-300 mt-0.5">
+                    admin@gap.edu / adminpassword123
+                  </p>
                 </div>
-                <button 
-                  onClick={() => copyToClipboard('admin@gap.edu', 'admin')}
+                <button
+                  onClick={() => copyToClipboard("admin@gap.edu", "admin")}
                   className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
                 >
-                  {copiedText === 'admin' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedText === "admin" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
 
               {/* Lecturer */}
               <div className="flex justify-between items-center text-xs p-2 bg-slate-950/40 rounded border border-slate-800/60">
                 <div>
-                  <p className="font-bold text-slate-400">Lecturer (Dr. John Doe)</p>
-                  <p className="font-mono text-slate-300 mt-0.5">lecturer1@gap.edu / password123</p>
+                  <p className="font-bold text-slate-400">
+                    Lecturer (Dr. John Doe)
+                  </p>
+                  <p className="font-mono text-slate-300 mt-0.5">
+                    lecturer1@gap.edu / password123
+                  </p>
                 </div>
-                <button 
-                  onClick={() => copyToClipboard('lecturer1@gap.edu', 'lecturer')}
+                <button
+                  onClick={() =>
+                    copyToClipboard("lecturer1@gap.edu", "lecturer")
+                  }
                   className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
                 >
-                  {copiedText === 'lecturer' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedText === "lecturer" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
 
               {/* Students */}
               <div className="flex justify-between items-center text-xs p-2 bg-slate-950/40 rounded border border-slate-800/60">
                 <div>
-                  <p className="font-bold text-slate-400">Student (Alice Smith)</p>
-                  <p className="font-mono text-slate-300 mt-0.5">CPE/2021/001 / smith</p>
+                  <p className="font-bold text-slate-400">
+                    Student (Alice Smith)
+                  </p>
+                  <p className="font-mono text-slate-300 mt-0.5">
+                    CPE/2021/001 / smith
+                  </p>
                 </div>
-                <button 
-                  onClick={() => copyToClipboard('CPE/2021/001', 'student1')}
+                <button
+                  onClick={() => copyToClipboard("CPE/2021/001", "student1")}
                   className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
                 >
-                  {copiedText === 'student1' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedText === "student1" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -133,7 +175,9 @@ const Login: React.FC = () => {
         <div className="lg:col-span-6">
           <div className="glass-panel p-8 relative overflow-hidden">
             <h2 className="text-xl font-bold mb-1">Welcome back</h2>
-            <p className="text-slate-400 text-xs mb-6">Enter your credentials to access your exam dashboard.</p>
+            <p className="text-slate-400 text-xs mb-6">
+              Enter your credentials to access your exam dashboard.
+            </p>
 
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
@@ -145,9 +189,11 @@ const Login: React.FC = () => {
 
               {/* Identifier Input */}
               <div className="space-y-1.5 text-left">
-                <label className="text-xs font-semibold text-slate-400">Email or Registration Number</label>
+                <label className="text-xs font-semibold text-slate-400">
+                  Email or Registration Number
+                </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-slate-500" />
+                  <Mail className="absolute left-2 bottom-2.5 h-4.5 w-4.5 text-slate-500" />
                   <input
                     type="text"
                     required
@@ -161,17 +207,33 @@ const Login: React.FC = () => {
 
               {/* Password Input */}
               <div className="space-y-1.5 text-left">
-                <label className="text-xs font-semibold text-slate-400">Password</label>
+                <label className="text-xs font-semibold text-slate-400">
+                  Password
+                </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-slate-500" />
+                  <Lock className="absolute left-2 bottom-2.5 h-4.5 w-4.5 text-slate-500" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="glass-input w-full pl-11"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4.5 w-4.5" />
+                    ) : (
+                      <Eye className="h-4.5 w-4.5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
