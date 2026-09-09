@@ -26,7 +26,7 @@
   .glass-panel {
     @apply bg-slate-900/60 backdrop-blur-md border border-slate-800/80 shadow-xl shadow-black/20 rounded-xl;
   }
-  
+
   .glass-card {
     @apply bg-slate-900/40 backdrop-blur-sm border border-slate-800/50 shadow-md shadow-black/10 rounded-lg hover:border-slate-700/60 hover:bg-slate-900/60 hover:scale-[1.008] transition-all duration-300;
   }
@@ -59,13 +59,24 @@
 
 /* Animations */
 @keyframes modal-zoom {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .animate-pulse-slow {
