@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { QuestionService } from './question.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -8,7 +18,13 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Exams - Questions & Gaps')
 @ApiBearerAuth('JWT-auth')
@@ -19,19 +35,39 @@ export class QuestionController {
 
   @Post()
   @Roles(Role.ADMIN, Role.LECTURER)
-  @ApiOperation({ summary: 'Create a new fill-in-the-gap question with gaps and accepted answers atomically (Admin / Lecturer only)' })
+  @ApiOperation({
+    summary:
+      'Create a new fill-in-the-gap question with gaps and accepted answers atomically (Admin / Lecturer only)',
+  })
   @ApiResponse({ status: 201, description: 'Question created' })
-  @ApiResponse({ status: 400, description: 'Gap configuration mismatch / circular dependencies / inter-topic dependency mismatch / locks active' })
-  @ApiResponse({ status: 403, description: 'Unauthorized access to exam configuration' })
-  @ApiResponse({ status: 404, description: 'Topic or previous dependent question not found' })
-  create(@Body() createQuestionDto: CreateQuestionDto, @CurrentUser() user: User) {
+  @ApiResponse({
+    status: 400,
+    description:
+      'Gap configuration mismatch / circular dependencies / inter-topic dependency mismatch / locks active',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Unauthorized access to exam configuration',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Topic or previous dependent question not found',
+  })
+  create(
+    @Body() createQuestionDto: CreateQuestionDto,
+    @CurrentUser() user: User,
+  ) {
     return this.questionService.create(createQuestionDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get list of all questions under a topic' })
   @ApiQuery({ name: 'topicId', description: 'The ID (UUID) of the topic' })
-  @ApiResponse({ status: 200, description: 'List of questions retrieved (correct answers are stripped if requester is STUDENT)' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'List of questions retrieved (correct answers are stripped if requester is STUDENT)',
+  })
   @ApiResponse({ status: 403, description: 'Unauthorized to view questions' })
   @ApiResponse({ status: 404, description: 'Topic not found' })
   findAll(@Query('topicId') topicId: string, @CurrentUser() user: User) {
@@ -40,7 +76,11 @@ export class QuestionController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get specific question details' })
-  @ApiResponse({ status: 200, description: 'Question details (correct answers are stripped if requester is STUDENT)' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Question details (correct answers are stripped if requester is STUDENT)',
+  })
   @ApiResponse({ status: 403, description: 'Unauthorized to view question' })
   @ApiResponse({ status: 404, description: 'Question not found' })
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
@@ -49,9 +89,15 @@ export class QuestionController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.LECTURER)
-  @ApiOperation({ summary: 'Update question text, dependency link, or replace gap configurations (Admin / Lecturer only)' })
+  @ApiOperation({
+    summary:
+      'Update question text, dependency link, or replace gap configurations (Admin / Lecturer only)',
+  })
   @ApiResponse({ status: 200, description: 'Question updated successfully' })
-  @ApiResponse({ status: 400, description: 'Circular dependency / gap mismatch / locks active' })
+  @ApiResponse({
+    status: 400,
+    description: 'Circular dependency / gap mismatch / locks active',
+  })
   @ApiResponse({ status: 403, description: 'Unauthorized to edit question' })
   @ApiResponse({ status: 404, description: 'Question not found' })
   update(
@@ -66,7 +112,10 @@ export class QuestionController {
   @Roles(Role.ADMIN, Role.LECTURER)
   @ApiOperation({ summary: 'Delete a question (Admin / Lecturer only)' })
   @ApiResponse({ status: 200, description: 'Question deleted successfully' })
-  @ApiResponse({ status: 400, description: 'Question cannot be deleted because locks are active' })
+  @ApiResponse({
+    status: 400,
+    description: 'Question cannot be deleted because locks are active',
+  })
   @ApiResponse({ status: 403, description: 'Unauthorized to delete question' })
   @ApiResponse({ status: 404, description: 'Question not found' })
   remove(@Param('id') id: string, @CurrentUser() user: User) {

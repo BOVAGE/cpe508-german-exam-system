@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamService } from '../exam/exam.service';
 import { ExamTopicConfigService } from '../exam/exam-topic-config.service';
@@ -71,7 +77,9 @@ export class ExamAttemptService implements OnModuleInit {
   // Core Attempt Initiation endpoint
   async startAttempt(examId: string, student: User) {
     if (student.role !== Role.STUDENT) {
-      throw new ForbiddenException('Only student accounts can start exam attempts');
+      throw new ForbiddenException(
+        'Only student accounts can start exam attempts',
+      );
     }
 
     const exam = await this.prisma.exam.findUnique({
@@ -91,20 +99,28 @@ export class ExamAttemptService implements OnModuleInit {
       },
     });
     if (!isParticipant) {
-      throw new ForbiddenException('You are not registered as an eligible participant for this exam');
+      throw new ForbiddenException(
+        'You are not registered as an eligible participant for this exam',
+      );
     }
 
     // Confirm the exam is currently available (Status and time checks)
     if (exam.status !== ExamStatus.PUBLISHED) {
-      throw new ForbiddenException('This exam is in DRAFT status and is not yet available');
+      throw new ForbiddenException(
+        'This exam is in DRAFT status and is not yet available',
+      );
     }
 
     const now = new Date();
     if (now < exam.scheduledStart) {
-      throw new ForbiddenException(`This exam has not started yet. It is scheduled to start at ${exam.scheduledStart.toISOString()}`);
+      throw new ForbiddenException(
+        `This exam has not started yet. It is scheduled to start at ${exam.scheduledStart.toISOString()}`,
+      );
     }
     if (now > exam.scheduledEnd) {
-      throw new ForbiddenException('This exam has already ended. Access closed.');
+      throw new ForbiddenException(
+        'This exam has already ended. Access closed.',
+      );
     }
 
     // Confirm they do not already have an attempt
@@ -117,7 +133,9 @@ export class ExamAttemptService implements OnModuleInit {
       },
     });
     if (existingAttempt) {
-      throw new BadRequestException('You have already started or submitted an attempt for this exam');
+      throw new BadRequestException(
+        'You have already started or submitted an attempt for this exam',
+      );
     }
 
     // Generate the randomized question set based on the configs
@@ -126,10 +144,16 @@ export class ExamAttemptService implements OnModuleInit {
     });
 
     if (configs.length === 0) {
-      throw new BadRequestException('This exam does not have any topic distribution configurations configured yet');
+      throw new BadRequestException(
+        'This exam does not have any topic distribution configurations configured yet',
+      );
     }
 
-    const selectedBlocks: { id: string; size: number; questionIds: string[] }[] = [];
+    const selectedBlocks: {
+      id: string;
+      size: number;
+      questionIds: string[];
+    }[] = [];
 
     for (const config of configs) {
       const blocks = await this.configService.getTopicBlocks(config.topicId);
@@ -137,11 +161,12 @@ export class ExamAttemptService implements OnModuleInit {
 
       if (combinations.length === 0) {
         throw new BadRequestException(
-          `Unable to satisfy question distribution count (${config.questionCount}) for topic ID ${config.topicId} due to dependency chains.`
+          `Unable to satisfy question distribution count (${config.questionCount}) for topic ID ${config.topicId} due to dependency chains.`,
         );
       }
 
-      const randomCombination = combinations[Math.floor(Math.random() * combinations.length)];
+      const randomCombination =
+        combinations[Math.floor(Math.random() * combinations.length)];
       selectedBlocks.push(...randomCombination);
     }
 
@@ -247,7 +272,10 @@ export class ExamAttemptService implements OnModuleInit {
     // Lazy finalization check
     if (attempt.status === AttemptStatus.IN_PROGRESS) {
       const durationMs = attempt.exam.duration * 60 * 1000;
-      const deadline = Math.min(attempt.startedAt.getTime() + durationMs, attempt.exam.scheduledEnd.getTime());
+      const deadline = Math.min(
+        attempt.startedAt.getTime() + durationMs,
+        attempt.exam.scheduledEnd.getTime(),
+      );
       const now = Date.now();
 
       if (now > deadline) {
@@ -275,17 +303,24 @@ export class ExamAttemptService implements OnModuleInit {
     }
 
     if (attempt.status !== AttemptStatus.IN_PROGRESS) {
-      throw new BadRequestException(`Cannot save answer. Attempt status is ${attempt.status}`);
+      throw new BadRequestException(
+        `Cannot save answer. Attempt status is ${attempt.status}`,
+      );
     }
 
     // Deadline check
     const durationMs = attempt.exam.duration * 60 * 1000;
-    const deadline = Math.min(attempt.startedAt.getTime() + durationMs, attempt.exam.scheduledEnd.getTime());
+    const deadline = Math.min(
+      attempt.startedAt.getTime() + durationMs,
+      attempt.exam.scheduledEnd.getTime(),
+    );
     const now = Date.now();
 
     if (now > deadline) {
       await this.finalizeAttempt(attempt.id, AttemptStatus.AUTO_SUBMITTED);
-      throw new BadRequestException('Exam time has expired. Your attempt has been automatically finalized.');
+      throw new BadRequestException(
+        'Exam time has expired. Your attempt has been automatically finalized.',
+      );
     }
 
     // Find the AttemptQuestion
@@ -299,7 +334,9 @@ export class ExamAttemptService implements OnModuleInit {
     });
 
     if (!attemptQuestion) {
-      throw new NotFoundException('Question does not belong to your randomized exam attempt');
+      throw new NotFoundException(
+        'Question does not belong to your randomized exam attempt',
+      );
     }
 
     // Find the QuestionGap
@@ -313,7 +350,9 @@ export class ExamAttemptService implements OnModuleInit {
     });
 
     if (!gap) {
-      throw new NotFoundException(`Gap position ${dto.gapPosition} not found in this question`);
+      throw new NotFoundException(
+        `Gap position ${dto.gapPosition} not found in this question`,
+      );
     }
 
     // Save the student's answer
@@ -352,14 +391,20 @@ export class ExamAttemptService implements OnModuleInit {
     }
 
     if (attempt.status !== AttemptStatus.IN_PROGRESS) {
-      throw new BadRequestException(`Attempt has already been submitted (status is ${attempt.status})`);
+      throw new BadRequestException(
+        `Attempt has already been submitted (status is ${attempt.status})`,
+      );
     }
 
     const durationMs = attempt.exam.duration * 60 * 1000;
-    const deadline = Math.min(attempt.startedAt.getTime() + durationMs, attempt.exam.scheduledEnd.getTime());
+    const deadline = Math.min(
+      attempt.startedAt.getTime() + durationMs,
+      attempt.exam.scheduledEnd.getTime(),
+    );
     const now = Date.now();
 
-    const finalStatus = now > deadline ? AttemptStatus.AUTO_SUBMITTED : AttemptStatus.SUBMITTED;
+    const finalStatus =
+      now > deadline ? AttemptStatus.AUTO_SUBMITTED : AttemptStatus.SUBMITTED;
     return this.finalizeAttempt(attempt.id, finalStatus);
   }
 
@@ -402,8 +447,12 @@ export class ExamAttemptService implements OnModuleInit {
         for (const gap of attemptQ.question.gaps) {
           totalExamMaxPoints += gap.points;
 
-          const studentAnsRecord = attemptQ.gapAnswers.find((ga) => ga.questionGapId === gap.id);
-          const studentAnsText = studentAnsRecord ? studentAnsRecord.answer : '';
+          const studentAnsRecord = attemptQ.gapAnswers.find(
+            (ga) => ga.questionGapId === gap.id,
+          );
+          const studentAnsText = studentAnsRecord
+            ? studentAnsRecord.answer
+            : '';
 
           const acceptedAnsList = gap.acceptedAnswers.map((aa) => aa.answer);
           const isCorrect = this.gradingService.isAnswerCorrect(
@@ -444,7 +493,10 @@ export class ExamAttemptService implements OnModuleInit {
         totalExamScore += questionScore;
       }
 
-      const percentage = totalExamMaxPoints > 0 ? (totalExamScore / totalExamMaxPoints) * 100 : 0.0;
+      const percentage =
+        totalExamMaxPoints > 0
+          ? (totalExamScore / totalExamMaxPoints) * 100
+          : 0.0;
 
       return tx.examAttempt.update({
         where: { id: attemptId },
@@ -487,7 +539,10 @@ export class ExamAttemptService implements OnModuleInit {
 
     for (const attempt of activeAttempts) {
       const durationMs = attempt.exam.duration * 60 * 1000;
-      const deadline = Math.min(attempt.startedAt.getTime() + durationMs, attempt.exam.scheduledEnd.getTime());
+      const deadline = Math.min(
+        attempt.startedAt.getTime() + durationMs,
+        attempt.exam.scheduledEnd.getTime(),
+      );
 
       if (now > deadline) {
         await this.finalizeAttempt(attempt.id, AttemptStatus.AUTO_SUBMITTED);
@@ -505,7 +560,9 @@ export class ExamAttemptService implements OnModuleInit {
       throw new NotFoundException(`Exam with ID ${examId} not found`);
     }
     if (user.role === Role.LECTURER && exam.createdById !== user.id) {
-      throw new ForbiddenException('You are not authorized to manage attempts for this exam');
+      throw new ForbiddenException(
+        'You are not authorized to manage attempts for this exam',
+      );
     }
     return exam;
   }
@@ -580,7 +637,9 @@ export class ExamAttemptService implements OnModuleInit {
     });
 
     if (!attempt) {
-      throw new NotFoundException(`Attempt with ID ${attemptId} not found for this exam`);
+      throw new NotFoundException(
+        `Attempt with ID ${attemptId} not found for this exam`,
+      );
     }
 
     await this.prisma.examAttempt.delete({

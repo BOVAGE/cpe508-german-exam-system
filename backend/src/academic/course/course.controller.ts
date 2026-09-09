@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -8,7 +17,12 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('Academic Structure - Courses')
 @ApiBearerAuth('JWT-auth')
@@ -28,16 +42,24 @@ export class CourseController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get list of courses (Filtered by assignment for Lecturers)' })
+  @ApiOperation({
+    summary: 'Get list of courses (Filtered by assignment for Lecturers)',
+  })
   @ApiResponse({ status: 200, description: 'List of courses retrieved' })
   findAll(@CurrentUser() user: User) {
     return this.courseService.findAll(user);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get specific course details (Enforces Lecturer assignment access)' })
+  @ApiOperation({
+    summary:
+      'Get specific course details (Enforces Lecturer assignment access)',
+  })
   @ApiResponse({ status: 200, description: 'Course details' })
-  @ApiResponse({ status: 403, description: 'Forbidden if lecturer is not assigned' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden if lecturer is not assigned',
+  })
   @ApiResponse({ status: 404, description: 'Course not found' })
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.courseService.findOne(id, user);

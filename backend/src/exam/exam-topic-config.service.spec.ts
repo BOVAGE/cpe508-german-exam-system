@@ -41,10 +41,10 @@ describe('ExamTopicConfigService - Subset Sum Solver', () => {
       // Blocks sizes: 3, 2, 1
       const blocks = [{ size: 3 }, { size: 2 }, { size: 1 }];
 
-      expect(service.canFormSubsetSum(blocks, 5)).toBe(true);  // 3 + 2
-      expect(service.canFormSubsetSum(blocks, 4)).toBe(true);  // 3 + 1
-      expect(service.canFormSubsetSum(blocks, 6)).toBe(true);  // 3 + 2 + 1
-      expect(service.canFormSubsetSum(blocks, 0)).toBe(true);  // empty set
+      expect(service.canFormSubsetSum(blocks, 5)).toBe(true); // 3 + 2
+      expect(service.canFormSubsetSum(blocks, 4)).toBe(true); // 3 + 1
+      expect(service.canFormSubsetSum(blocks, 6)).toBe(true); // 3 + 2 + 1
+      expect(service.canFormSubsetSum(blocks, 0)).toBe(true); // empty set
       expect(service.canFormSubsetSum(blocks, 7)).toBe(false); // exceeds total
     });
 
@@ -52,8 +52,8 @@ describe('ExamTopicConfigService - Subset Sum Solver', () => {
       // Topic has chains of size 3 and 3
       const blocks = [{ size: 3 }, { size: 3 }];
 
-      expect(service.canFormSubsetSum(blocks, 3)).toBe(true);  // 1 chain of 3
-      expect(service.canFormSubsetSum(blocks, 6)).toBe(true);  // both chains (6)
+      expect(service.canFormSubsetSum(blocks, 3)).toBe(true); // 1 chain of 3
+      expect(service.canFormSubsetSum(blocks, 6)).toBe(true); // both chains (6)
       expect(service.canFormSubsetSum(blocks, 5)).toBe(false); // impossible to form 5
       expect(service.canFormSubsetSum(blocks, 4)).toBe(false); // impossible to form 4
       expect(service.canFormSubsetSum(blocks, 2)).toBe(false); // impossible to form 2
@@ -67,11 +67,11 @@ describe('ExamTopicConfigService - Subset Sum Solver', () => {
         { size: 1 }, // Independent Q8
       ];
 
-      expect(service.canFormSubsetSum(blocks, 5)).toBe(true);  // 4 + 1
-      expect(service.canFormSubsetSum(blocks, 3)).toBe(true);  // 2 + 1
-      expect(service.canFormSubsetSum(blocks, 7)).toBe(true);  // 4 + 2 + 1
-      expect(service.canFormSubsetSum(blocks, 6)).toBe(true);  // 4 + 2
-      expect(service.canFormSubsetSum(blocks, 8)).toBe(true);  // all of them
+      expect(service.canFormSubsetSum(blocks, 5)).toBe(true); // 4 + 1
+      expect(service.canFormSubsetSum(blocks, 3)).toBe(true); // 2 + 1
+      expect(service.canFormSubsetSum(blocks, 7)).toBe(true); // 4 + 2 + 1
+      expect(service.canFormSubsetSum(blocks, 6)).toBe(true); // 4 + 2
+      expect(service.canFormSubsetSum(blocks, 8)).toBe(true); // all of them
       expect(service.canFormSubsetSum(blocks, 9)).toBe(false); // impossible
     });
   });

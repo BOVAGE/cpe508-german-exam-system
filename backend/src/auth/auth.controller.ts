@@ -4,7 +4,12 @@ import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -13,7 +18,10 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login to obtain JWT access token (Public)' })
-  @ApiResponse({ status: 200, description: 'JWT Access token returned successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'JWT Access token returned successfully',
+  })
   @ApiResponse({ status: 401, description: 'Invalid login credentials' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);

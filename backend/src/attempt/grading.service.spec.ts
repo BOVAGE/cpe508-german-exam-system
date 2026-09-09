@@ -25,12 +25,16 @@ describe('GradingService', () => {
     });
 
     it('should trim whitespace but require exact case', () => {
-      expect(service.isAnswerCorrect('  Python  ', ['Python'], mode)).toBe(true);
+      expect(service.isAnswerCorrect('  Python  ', ['Python'], mode)).toBe(
+        true,
+      );
       expect(service.isAnswerCorrect('python', ['Python'], mode)).toBe(false);
     });
 
     it('should match any accepted answer in the list', () => {
-      expect(service.isAnswerCorrect('CPU', ['ALU', 'CPU', 'Register'], mode)).toBe(true);
+      expect(
+        service.isAnswerCorrect('CPU', ['ALU', 'CPU', 'Register'], mode),
+      ).toBe(true);
     });
 
     it('should fail for slight spelling mistakes', () => {
@@ -62,11 +66,17 @@ describe('GradingService', () => {
       // 3. Long answers (>= 8 chars): 2 char tolerance
       // "microprocessor" is length 14
       // "microprocesor" has dist 1 (missing s) -> Match!
-      expect(service.isAnswerCorrect('microprocesor', ['microprocessor'], mode)).toBe(true);
+      expect(
+        service.isAnswerCorrect('microprocesor', ['microprocessor'], mode),
+      ).toBe(true);
       // "microprocsor" has dist 2 (missing e and s) -> Match!
-      expect(service.isAnswerCorrect('microprocsor', ['microprocessor'], mode)).toBe(true);
+      expect(
+        service.isAnswerCorrect('microprocsor', ['microprocessor'], mode),
+      ).toBe(true);
       // "microprocor" has dist 3 -> Fail!
-      expect(service.isAnswerCorrect('microprocor', ['microprocessor'], mode)).toBe(false);
+      expect(
+        service.isAnswerCorrect('microprocor', ['microprocessor'], mode),
+      ).toBe(false);
     });
   });
 });
