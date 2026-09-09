@@ -195,23 +195,10 @@ export class ExamParticipantService {
       }
     }
 
-    checkField(regNumAliases, 'registrationNumber');
-    checkField(firstNameAliases, 'firstName');
-    checkField(lastNameAliases, 'lastName');
-    checkField(emailAliases, 'email');
-    checkField(deptCodeAliases, 'departmentCode');
-
-    const getVal = (data: any, aliases: string[]) => {
-      for (const key of Object.keys(data)) {
-        if (aliases.includes(normalize(key))) {
-          return extractCellString(data[key]);
-        }
-      }
-      return '';
-    };
-
     const errors: string[] = [];
     let importedCount = 0;
+    const existingRegSet = new Set<string>();
+    const existingEmailSet = new Set<string>();
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -245,16 +232,32 @@ export class ExamParticipantService {
             where: { registrationNumber: regNum },
           });
           if (existingReg) {
+            if (existingRegSet.has(regNum)) {
+              errors.push(
+                `Row ${rowNumber}: Registration number "${regNum}" is duplicated in the file.`,
+              );
+              continue;
+            }
+          }
+
+          if (!existingEmailSet.has(email)) {
+            const existingEmail = await tx.user.findUnique({ where: { email } });
+            if (existingEmail) {
+              errors.push(
+                `Row ${rowNumber}: Email "${email}" is already registered.`,
+              );
+              continue;
+            }
+          } else {
             errors.push(
-              `Row ${rowNumber}: Registration number "${regNum}" is already registered.`,
+              `Row ${rowNumber}: Email "${email}" is duplicated in the file.`,
             );
             continue;
           }
 
-          const existingEmail = await tx.user.findUnique({ where: { email } });
-          if (existingEmail) {
+          if (existingReg) {
             errors.push(
-              `Row ${rowNumber}: Email "${email}" is already registered.`,
+              `Row ${rowNumber}: Registration number "${regNum}" is already registered.`,
             );
             continue;
           }
@@ -270,7 +273,7 @@ export class ExamParticipantService {
               email,
               password: hashedPassword,
               role: Role.STUDENT,
-              departmentId: deptId,
+              departmentId: dept.id,
             },
           });
 
