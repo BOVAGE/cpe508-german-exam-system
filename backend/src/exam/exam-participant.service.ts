@@ -11,7 +11,7 @@ export class ExamParticipantService {
   constructor(
     private prisma: PrismaService,
     private examService: ExamService,
-  ) {}
+  ) { }
 
   async addParticipant(dto: CreateExamParticipantDto, user: User) {
     const exam = await this.prisma.exam.findUnique({ where: { id: dto.examId } });
@@ -55,7 +55,7 @@ export class ExamParticipantService {
 
   async getParticipants(examId: string, user: User) {
     await this.examService.findOne(examId, user); // check access
-    
+
     return this.prisma.examParticipant.findMany({
       where: { examId },
       include: {
@@ -104,13 +104,36 @@ export class ExamParticipantService {
       throw new BadRequestException('Excel file must contain at least one worksheet');
     }
 
+    const extractCellString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val === 'number') return String(val).trim();
+
+      if (typeof val === 'object') {
+        if (val.text !== undefined) {
+          if (typeof val.text === 'string') return val.text.trim();
+          if (typeof val.text === 'object') return extractCellString(val.text);
+        }
+        if (val.hyperlink !== undefined) {
+          return String(val.hyperlink).replace(/^mailto:/i, '').trim();
+        }
+        if (val.result !== undefined) {
+          return extractCellString(val.result);
+        }
+        if (Array.isArray(val.richText)) {
+          return val.richText.map((rt: any) => rt.text || '').join('').trim();
+        }
+      }
+      return String(val).trim();
+    };
+
     const rows: any[] = [];
     let headers: string[] = [];
 
     worksheet.eachRow((row, rowNumber) => {
       const values = (row.values as any[]).slice(1);
       if (rowNumber === 1) {
-        headers = values.map((h) => String(h).trim().toLowerCase());
+        headers = values.map((h) => extractCellString(h).toLowerCase());
       } else {
         const rowData: any = {};
         headers.forEach((header, index) => {
@@ -145,7 +168,7 @@ export class ExamParticipantService {
     const getVal = (data: any, aliases: string[]) => {
       for (const key of Object.keys(data)) {
         if (aliases.includes(normalize(key))) {
-          return data[key];
+          return extractCellString(data[key]);
         }
       }
       return '';
@@ -159,8 +182,8 @@ export class ExamParticipantService {
     const deptMap = new Map(departments.map((d) => [d.code.toUpperCase(), d.id]));
 
     // Pre-fetch existing registration numbers and emails to avoid N+1 roundtrips over remote network
-    const allRegNums = rows.map(({ data }) => String(getVal(data, regNumAliases) || '').trim()).filter(Boolean);
-    const allEmails = rows.map(({ data }) => String(getVal(data, emailAliases) || '').trim().toLowerCase()).filter(Boolean);
+    const allRegNums = rows.map(({ data }) => getVal(data, regNumAliases)).filter(Boolean);
+    const allEmails = rows.map(({ data }) => getVal(data, emailAliases).toLowerCase()).filter(Boolean);
 
     const existingUsers = await this.prisma.user.findMany({
       where: {
@@ -178,11 +201,11 @@ export class ExamParticipantService {
     await this.prisma.$transaction(
       async (tx) => {
         for (const { rowNumber, data } of rows) {
-          const regNum = String(getVal(data, regNumAliases) || '').trim();
-          const firstName = String(getVal(data, firstNameAliases) || '').trim();
-          const lastName = String(getVal(data, lastNameAliases) || '').trim();
-          const email = String(getVal(data, emailAliases) || '').trim().toLowerCase();
-          const deptCode = String(getVal(data, deptCodeAliases) || '').trim().toUpperCase();
+          const regNum = getVal(data, regNumAliases);
+          const firstName = getVal(data, firstNameAliases);
+          const lastName = getVal(data, lastNameAliases);
+          const email = getVal(data, emailAliases).toLowerCase();
+          const deptCode = getVal(data, deptCodeAliases).toUpperCase();
 
           if (!regNum || !firstName || !lastName || !email || !deptCode) {
             errors.push(`Row ${rowNumber}: All fields must be non-empty.`);
@@ -257,6 +280,29 @@ export class ExamParticipantService {
       throw new BadRequestException('Excel file must contain at least one worksheet');
     }
 
+    const extractCellString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val === 'number') return String(val).trim();
+
+      if (typeof val === 'object') {
+        if (val.text !== undefined) {
+          if (typeof val.text === 'string') return val.text.trim();
+          if (typeof val.text === 'object') return extractCellString(val.text);
+        }
+        if (val.hyperlink !== undefined) {
+          return String(val.hyperlink).replace(/^mailto:/i, '').trim();
+        }
+        if (val.result !== undefined) {
+          return extractCellString(val.result);
+        }
+        if (Array.isArray(val.richText)) {
+          return val.richText.map((rt: any) => rt.text || '').join('').trim();
+        }
+      }
+      return String(val).trim();
+    };
+
     let headers: string[] = [];
     const registrationNumbers: string[] = [];
 
@@ -266,11 +312,14 @@ export class ExamParticipantService {
     worksheet.eachRow((row, rowNumber) => {
       const values = (row.values as any[]).slice(1);
       if (rowNumber === 1) {
-        headers = values.map((h) => String(h).trim().toLowerCase());
+        headers = values.map((h) => extractCellString(h).toLowerCase());
       } else {
         const regNumIdx = headers.findIndex((h) => regNumAliases.includes(normalize(h)));
         if (regNumIdx !== -1 && values[regNumIdx]) {
-          registrationNumbers.push(String(values[regNumIdx]).trim());
+          const regStr = extractCellString(values[regNumIdx]);
+          if (regStr) {
+            registrationNumbers.push(regStr);
+          }
         }
       }
     });
@@ -450,10 +499,10 @@ export class ExamParticipantService {
       'Examination Status',
     ];
     worksheet.addRow(headers);
-    
+
     const headerRow = worksheet.getRow(2);
     headerRow.height = 25;
-    
+
     // Style Header Cells
     headerRow.eachCell((cell) => {
       cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
