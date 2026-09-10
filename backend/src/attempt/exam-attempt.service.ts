@@ -180,55 +180,61 @@ export class ExamAttemptService implements OnModuleInit {
     });
 
     // Write attempt and questions inside a transaction
-    return this.prisma.$transaction(async (tx) => {
-      const attempt = await tx.examAttempt.create({
-        data: {
-          examId,
-          studentId: student.id,
-          status: AttemptStatus.IN_PROGRESS,
-          startedAt: now,
-          score: 0.0,
-          percentage: 0.0,
-        },
-      });
-
-      // Insert generated questions into AttemptQuestion
-      for (let i = 0; i < finalQuestionIds.length; i++) {
-        await tx.attemptQuestion.create({
+    return this.prisma.$transaction(
+      async (tx) => {
+        const attempt = await tx.examAttempt.create({
           data: {
-            attemptId: attempt.id,
-            questionId: finalQuestionIds[i],
-            displayOrder: i + 1,
-            scoreAwarded: 0.0,
+            examId,
+            studentId: student.id,
+            status: AttemptStatus.IN_PROGRESS,
+            startedAt: now,
+            score: 0.0,
+            percentage: 0.0,
           },
         });
-      }
 
-      return tx.examAttempt.findUnique({
-        where: { id: attempt.id },
-        include: {
-          questions: {
-            orderBy: { displayOrder: 'asc' },
-            include: {
-              question: {
-                select: {
-                  id: true,
-                  questionText: true,
-                  gaps: {
-                    select: {
-                      id: true,
-                      position: true,
-                      points: true,
+        // Insert generated questions into AttemptQuestion in bulk
+        if (finalQuestionIds.length > 0) {
+          await tx.attemptQuestion.createMany({
+            data: finalQuestionIds.map((questionId, index) => ({
+              attemptId: attempt.id,
+              questionId,
+              displayOrder: index + 1,
+              scoreAwarded: 0.0,
+            })),
+          });
+        }
+
+        return tx.examAttempt.findUnique({
+          where: { id: attempt.id },
+          include: {
+            questions: {
+              orderBy: { displayOrder: 'asc' },
+              include: {
+                question: {
+                  select: {
+                    id: true,
+                    questionText: true,
+                    gaps: {
+                      select: {
+                        id: true,
+                        position: true,
+                        points: true,
+                      },
+                      orderBy: { position: 'asc' },
                     },
-                    orderBy: { position: 'asc' },
                   },
                 },
               },
             },
           },
-        },
-      });
-    });
+        });
+      },
+      {
+        maxWait: 10000,
+        timeout: 60000,
+      },
+    );
   }
 
   // Retrieve current attempt state (checks deadline and auto-finalizes if necessary)
@@ -410,121 +416,127 @@ export class ExamAttemptService implements OnModuleInit {
 
   // Core finalization and grading procedure
   async finalizeAttempt(attemptId: string, finalStatus: AttemptStatus) {
-    return this.prisma.$transaction(async (tx) => {
-      const attempt = await tx.examAttempt.findUnique({
-        where: { id: attemptId },
-        include: {
-          exam: true,
-          questions: {
-            include: {
-              question: {
-                include: {
-                  gaps: {
-                    include: { acceptedAnswers: true },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const attempt = await tx.examAttempt.findUnique({
+          where: { id: attemptId },
+          include: {
+            exam: true,
+            questions: {
+              include: {
+                question: {
+                  include: {
+                    gaps: {
+                      include: { acceptedAnswers: true },
+                    },
                   },
                 },
+                gapAnswers: true,
               },
-              gapAnswers: true,
             },
           },
-        },
-      });
-
-      if (!attempt) {
-        throw new NotFoundException(`Attempt with ID ${attemptId} not found`);
-      }
-
-      if (attempt.status !== AttemptStatus.IN_PROGRESS) {
-        return attempt;
-      }
-
-      let totalExamScore = 0.0;
-      let totalExamMaxPoints = 0.0;
-
-      for (const attemptQ of attempt.questions) {
-        let questionScore = 0.0;
-
-        for (const gap of attemptQ.question.gaps) {
-          totalExamMaxPoints += gap.points;
-
-          const studentAnsRecord = attemptQ.gapAnswers.find(
-            (ga) => ga.questionGapId === gap.id,
-          );
-          const studentAnsText = studentAnsRecord
-            ? studentAnsRecord.answer
-            : '';
-
-          const acceptedAnsList = gap.acceptedAnswers.map((aa) => aa.answer);
-          const isCorrect = this.gradingService.isAnswerCorrect(
-            studentAnsText,
-            acceptedAnsList,
-            attempt.exam.gradingMode,
-          );
-
-          const pointsAwarded = isCorrect ? gap.points : 0.0;
-          questionScore += pointsAwarded;
-
-          await tx.attemptGapAnswer.upsert({
-            where: {
-              attemptQuestionId_questionGapId: {
-                attemptQuestionId: attemptQ.id,
-                questionGapId: gap.id,
-              },
-            },
-            update: {
-              isCorrect,
-              scoreAwarded: pointsAwarded,
-            },
-            create: {
-              attemptQuestionId: attemptQ.id,
-              questionGapId: gap.id,
-              answer: studentAnsText,
-              isCorrect,
-              scoreAwarded: pointsAwarded,
-            },
-          });
-        }
-
-        await tx.attemptQuestion.update({
-          where: { id: attemptQ.id },
-          data: { scoreAwarded: questionScore },
         });
 
-        totalExamScore += questionScore;
-      }
+        if (!attempt) {
+          throw new NotFoundException(`Attempt with ID ${attemptId} not found`);
+        }
 
-      const percentage =
-        totalExamMaxPoints > 0
-          ? (totalExamScore / totalExamMaxPoints) * 100
-          : 0.0;
+        if (attempt.status !== AttemptStatus.IN_PROGRESS) {
+          return attempt;
+        }
 
-      return tx.examAttempt.update({
-        where: { id: attemptId },
-        data: {
-          score: totalExamScore,
-          percentage,
-          submittedAt: new Date(),
-          status: finalStatus,
-        },
-        include: {
-          questions: {
-            orderBy: { displayOrder: 'asc' },
-            include: {
-              question: {
-                select: {
-                  id: true,
-                  questionText: true,
-                  gaps: {
-                    select: { id: true, position: true, points: true },
-                  },
+        let totalExamScore = 0.0;
+        let totalExamMaxPoints = 0.0;
+
+        for (const attemptQ of attempt.questions) {
+          let questionScore = 0.0;
+
+          for (const gap of attemptQ.question.gaps) {
+            totalExamMaxPoints += gap.points;
+
+            const studentAnsRecord = attemptQ.gapAnswers.find(
+              (ga) => ga.questionGapId === gap.id,
+            );
+            const studentAnsText = studentAnsRecord
+              ? studentAnsRecord.answer
+              : '';
+
+            const acceptedAnsList = gap.acceptedAnswers.map((aa) => aa.answer);
+            const isCorrect = this.gradingService.isAnswerCorrect(
+              studentAnsText,
+              acceptedAnsList,
+              attempt.exam.gradingMode,
+            );
+
+            const pointsAwarded = isCorrect ? gap.points : 0.0;
+            questionScore += pointsAwarded;
+
+            await tx.attemptGapAnswer.upsert({
+              where: {
+                attemptQuestionId_questionGapId: {
+                  attemptQuestionId: attemptQ.id,
+                  questionGapId: gap.id,
                 },
               },
-              gapAnswers: true,
+              update: {
+                isCorrect,
+                scoreAwarded: pointsAwarded,
+              },
+              create: {
+                attemptQuestionId: attemptQ.id,
+                questionGapId: gap.id,
+                answer: studentAnsText,
+                isCorrect,
+                scoreAwarded: pointsAwarded,
+              },
+            });
+          }
+
+          await tx.attemptQuestion.update({
+            where: { id: attemptQ.id },
+            data: { scoreAwarded: questionScore },
+          });
+
+          totalExamScore += questionScore;
+        }
+
+        const percentage =
+          totalExamMaxPoints > 0
+            ? (totalExamScore / totalExamMaxPoints) * 100
+            : 0.0;
+
+        return tx.examAttempt.update({
+          where: { id: attemptId },
+          data: {
+            score: totalExamScore,
+            percentage,
+            submittedAt: new Date(),
+            status: finalStatus,
+          },
+          include: {
+            questions: {
+              orderBy: { displayOrder: 'asc' },
+              include: {
+                question: {
+                  select: {
+                    id: true,
+                    questionText: true,
+                    gaps: {
+                      select: { id: true, position: true, points: true },
+                    },
+                  },
+                },
+                gapAnswers: true,
+              },
             },
           },
-        },
-      });
-    });
+        });
+      },
+      {
+        maxWait: 10000,
+        timeout: 60000,
+      },
+    );
   }
 
   // Periodic Cron Trigger: finalizes expired attempts
