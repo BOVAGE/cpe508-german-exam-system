@@ -28,16 +28,6 @@ export class CreateUserDto {
   registrationNumber?: string;
 
   @ApiProperty({
-    description: 'The password for the user account (Min length 6)',
-    minLength: 6,
-    example: 'mypassword123',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
-  password: string;
-
-  @ApiProperty({
     description: 'The role of the user inside the system',
     enum: Role,
     example: Role.LECTURER,
